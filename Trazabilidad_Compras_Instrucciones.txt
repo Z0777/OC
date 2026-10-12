@@ -1,0 +1,4650 @@
+﻿TRAZABILIDAD DE COMPRAS · POWER APPS
+Instrucciones de implementación: listas, fórmulas, jerarquía completa y flujos
+Sintaxis en español: ";" separa argumentos, ";;" encadena instrucciones, la coma es el decimal, Ungroup con comillas simples.
+drpVista ("Trabajando como") es un Cuadro combinado MODERNO: ver PARTE 3, sección "drpVista como Cuadro combinado moderno".
+
+CONTENIDO
+  PARTE 1 · LISTAS DE SHAREPOINT
+  PARTE 2 · APP.FORMULAS Y APP.ONSTART
+  PARTE 3 · JERARQUÍA COMPLETA DE scrTraza (contenedores, controles y propiedades)
+  PARTE 4 · FLUJOS DE POWER AUTOMATE
+  PARTE 5 · ORDEN DE IMPLEMENTACIÓN Y PRUEBAS
+
+
+******************************************************************************
+PARTE 1 · LISTAS DE SHAREPOINT
+******************************************************************************
+
+
+##############################################################################
+# 1. Arquitectura y listas de SharePoint
+##############################################################################
+
+La app es una sola pantalla, scrTraza, con tres pestañas (Panel, Órdenes de compra y Reglas de días), cinco listas de SharePoint y dos flujos de Power Automate. Toda la lógica de cálculo vive en App.Formulas; App.OnStart solo carga datos e inicializa variables. Sintaxis en configuración regional español: ; separa argumentos, ;; encadena instrucciones, la coma es el decimal y Ungroup usa comillas simples.
+
+  - TRZ_OrdenesCompra
+      Qué guarda: Una fila por PO con la fecha de cada paso
+      Qué carga la app: Abiertas + pagadas de los últimos 90 días
+  - TRZ_HistorialPO
+      Qué guarda: Un registro por movimiento o aviso
+      Qué carga la app: Solo el de la PO seleccionada
+  - TRZ_Config
+      Qué guarda: Una fila con los plazos
+      Qué carga la app: Completa
+  - TRZ_Equipo
+      Qué guarda: Persona, correo y área
+      Qué carga la app: Activos
+  - TRZ_Proveedores
+      Qué guarda: Catálogo de proveedores
+      Qué carga la app: Activos
+
+
+Crea las columnas sin espacios ni tildes: el nombre interno es el que se escribe en Power Apps. Etapa, Tipo y Area son texto de una línea, no Elección, para que un valor fuera de la lista nunca se descarte en silencio.
+
+
+--- TRZ_OrdenesCompra -----------------------------------------------------
+
+  - Title (mostrar como "PO")
+      Tipo: Una línea, exigir valores únicos
+      Indexar: Sí
+      Uso: Número de PO
+  - Proveedor
+      Tipo: Una línea
+      Indexar: Sí
+      Uso: Nombre del proveedor
+  - Descripcion
+      Tipo: Una línea (255)
+      Uso: Material
+  - Cantidad
+      Tipo: Una línea
+      Uso: Ej. 40 sacos
+  - PdfUrl
+      Tipo: Una línea
+      Uso: Enlace o nombre del PDF (opcional)
+  - DiasCredito
+      Tipo: Número, 0 decimales
+      Uso: Crédito del proveedor
+  - FechaSolicitud
+      Tipo: Fecha (solo fecha)
+      Uso: Registro de la PO
+  - SolicitadoPor
+      Tipo: Una línea
+      Uso: Quién registró
+  - FechaRecepcion
+      Tipo: Fecha
+      Uso: Bodega confirma
+  - TipoRecepcion
+      Tipo: Una línea
+      Uso: Completa / Parcial
+  - RecibidoPor
+      Tipo: Una línea
+  - FechaFactura
+      Tipo: Fecha
+      Uso: Factura en sistema
+  - NumFactura
+      Tipo: Una línea
+      Indexar: Sí
+      Uso: Serie y número FEL
+  - FacturaPor
+      Tipo: Una línea
+  - Fecha101
+      Tipo: Fecha
+      Uso: 101 registrado
+  - Doc101
+      Tipo: Una línea
+      Uso: Documento de material
+  - Por101
+      Tipo: Una línea
+  - FechaPago
+      Tipo: Fecha
+      Indexar: Sí
+      Uso: Pago registrado
+  - RefPago
+      Tipo: Una línea
+      Uso: Referencia de transferencia
+  - PagadoPor
+      Tipo: Una línea
+  - Llamadas
+      Tipo: Número, predeterminado 0
+      Uso: Contador de llamadas
+  - FechaUltLlamada
+      Tipo: Fecha
+  - ResultadoLlamada
+      Tipo: Una línea
+  - Rechazos
+      Tipo: Número, predeterminado 0
+      Uso: Facturas rechazadas
+  - Etapa
+      Tipo: Una línea
+      Indexar: Sí
+      Uso: Texto exacto de la tabla de etapas
+  - Cerrada
+      Tipo: Número (0 o 1)
+      Indexar: Sí
+      Uso: 1 al pagar
+  - FechaAlertaFactura
+      Tipo: Fecha
+      Indexar: Sí
+      Uso: Cuándo alertar a Atención a proveedores
+  - FechaLimite101
+      Tipo: Fecha
+      Indexar: Sí
+      Uso: Límite para dar el 101
+  - FechaPagoEstimada
+      Tipo: Fecha
+      Uso: 101 + días de crédito
+  - UltimoMovimiento
+      Tipo: Fecha y hora
+      Uso: Orden del listado
+
+
+--- TRZ_HistorialPO -------------------------------------------------------
+
+  - Title
+      Tipo: Una línea
+      Uso: Número de PO
+  - OrdenID
+      Tipo: Número
+      Indexar: Sí
+      Uso: ID de la PO
+  - Tipo
+      Tipo: Una línea
+      Indexar: Sí
+      Uso: Solicitud, Recepción, Factura, Llamada, 101, Rechazo, Pago, Nota, Edición, Aviso
+  - Detalle
+      Tipo: Varias líneas, texto sin formato
+      Uso: Lo que pasó
+  - FechaEvento
+      Tipo: Fecha
+      Uso: Fecha de trabajo del registro
+  - Area
+      Tipo: Una línea
+      Uso: Área de la vista usada
+  - RegistradoPor
+      Tipo: Una línea
+      Uso: Nombre real de quien guardó
+  - RegistradoEmail
+      Tipo: Una línea
+  - EnNombreDe
+      Tipo: Una línea
+      Uso: Persona de la vista (cuando el admin registra por otra)
+  - DestinatarioEmail
+      Tipo: Una línea
+      Uso: Correos separados por ; (solo avisos)
+
+
+--- Listas de apoyo -------------------------------------------------------
+
+  - TRZ_Config
+      Columnas: Title, DiasAlerta, DiasRellamada, Dias101, DiasCredito (Número)
+      Datos iniciales: Una fila: General, 3, 3, 4, 30
+  - TRZ_Equipo
+      Columnas: Title (nombre), Email, Area (Una línea), Activo (Sí/No)
+      Datos iniciales: Lorena = Compras, Magda = Bodega, Zoila = Proveedores, la persona de pagos = Pagos, tú = Admin
+  - TRZ_Proveedores
+      Columnas: Title, Activo (Sí/No)
+      Datos iniciales: Los proveedores frecuentes
+
+
+--- Etapas ----------------------------------------------------------------
+
+La etapa se escribe en cada guardado y las fechas límite se calculan en días hábiles (lunes a viernes) en ese momento. Así la app y Power Automate solo comparan fechas.
+
+  - Solicitada
+      Entra cuando: Se registra la PO
+      Siguiente paso: Magda confirma la recepción
+      Alerta roja: —
+  - Esperando factura
+      Entra cuando: Bodega confirma y no hay factura
+      Siguiente paso: Proveedor; luego Zoila llama
+      Alerta roja: Hoy ≥ FechaAlertaFactura
+  - Factura sin recepción
+      Entra cuando: Entra la factura antes que el producto
+      Siguiente paso: Magda confirma si llegó
+      Alerta roja: Desde el día siguiente
+  - Pendiente 101
+      Entra cuando: Hay recepción y factura
+      Siguiente paso: Lorena da el 101
+      Alerta roja: Hoy > FechaLimite101
+  - En crédito
+      Entra cuando: Hay 101 y factura
+      Siguiente paso: Cuentas por pagar
+      Alerta roja: Hoy ≥ FechaPagoEstimada (aviso amarillo)
+  - Pagada
+      Entra cuando: Se registra el pago
+      Siguiente paso: —
+      Alerta roja: —
+
+
+&#91;embedded content: Recorrido de una PO · 5 etapas, 1 desvío y el regreso por rechazo]
+
+La ruta normal baja por la columna; si la factura entra antes que el producto, la PO pasa por Factura sin recepción hasta que Magda confirma. Rechazar la factura la regresa a Esperando factura.
+
+
+******************************************************************************
+PARTE 2 · APP.FORMULAS Y APP.ONSTART
+******************************************************************************
+
+
+##############################################################################
+# 3. App.Formulas y App.OnStart
+##############################################################################
+
+App.Formulas calcula todo lo que se ve (etapa, alerta, responsable, días, filtros, indicadores) y se recalcula solo cuando cambia una colección o variable. App.OnStart carga cinco listas en paralelo e inicializa las variables. Ningún control guarda lógica de cálculo propia.
+
+Antes de pegar, en Configuración:
+
+- General › Límite de filas de datos: 2000.
+- Pantalla: Escalar para ajustar desactivado; Bloquear relación de aspecto desactivado.
+- Actualizaciones: Fórmulas con nombre activado.
+- Datos: agrega TRZ_OrdenesCompra, TRZ_HistorialPO, TRZ_Config, TRZ_Equipo y TRZ_Proveedores.
+- App.StartScreen: scrTraza.
+
+
+--- App.Formulas (reemplazar completo) ------------------------------------
+
+    ----- inicio código (powerfx) -----
+// ============================================================
+// 1. COLORES (hex como texto; ColorValue() solo en Fill y Color)
+// ============================================================
+hxTinta = "#14304F";;
+hxFondo = "#EEF1F5";;
+hxSuperficie = "#FFFFFF";;
+hxSuperficie2 = "#E6EBF1";;
+hxBorde = "#D2D9E2";;
+hxTexto = "#16202C";;
+hxTexto2 = "#5A6777";;
+hxAcento = "#1F5BA8";;
+hxAcentoSuave = "#DCE8F7";;
+hxOk = "#1B7A4B";;
+hxOkSuave = "#E3F1E9";;
+hxWarn = "#995A00";;
+hxWarnSuave = "#F7ECD9";;
+hxCrit = "#B3222C";;
+hxCritSuave = "#F6E1E2";;
+hxInfoSuave = "#E1EAF6";;
+
+// ============================================================
+// 2. PLAZOS Y FECHAS LÍMITE (días hábiles lunes a viernes)
+// ============================================================
+frCfg = First(colConfig);;
+frDiasAlerta = Coalesce(frCfg.DiasAlerta; 3);;
+frDiasRellamada = Coalesce(frCfg.DiasRellamada; 3);;
+frDias101 = Coalesce(frCfg.Dias101; 4);;
+frDiasCredito = Coalesce(frCfg.DiasCredito; 30);;
+
+frFechaAlerta =
+    Index(
+        Filter(ForAll(Sequence(frDiasAlerta * 2 + 7) As s; {F: DateAdd(varHoy; s.Value; TimeUnit.Days)}); Weekday(F; StartOfWeek.Monday) <= 5);
+        frDiasAlerta
+    ).F;;
+frFechaRellamada =
+    Index(
+        Filter(ForAll(Sequence(frDiasRellamada * 2 + 7) As s; {F: DateAdd(varHoy; s.Value; TimeUnit.Days)}); Weekday(F; StartOfWeek.Monday) <= 5);
+        frDiasRellamada
+    ).F;;
+frFechaLimite101 =
+    Index(
+        Filter(ForAll(Sequence(frDias101 * 2 + 7) As s; {F: DateAdd(varHoy; s.Value; TimeUnit.Days)}); Weekday(F; StartOfWeek.Monday) <= 5);
+        frDias101
+    ).F;;
+
+// ============================================================
+// 3. EQUIPO, USUARIO Y VISTA "TRABAJANDO COMO"
+// ============================================================
+frYo = LookUp(colEquipo; Lower(Email) = varEmail);;
+frMiArea = If(IsBlank(frYo); "Consulta"; frYo.Area);;
+frEsAdmin = frMiArea = "Admin";;
+frPuedeActuar = frEsAdmin Or (varVistaEmail = varEmail And frMiArea <> "Consulta");;
+frPuedeCrearPO = frPuedeActuar And varVistaArea in ["Compras"; "Admin"];;
+frAreaVista = Switch(varVistaArea; "Proveedores"; "Atención a proveedores"; "Pagos"; "Cuentas por pagar"; varVistaArea);;
+
+frPersonaCompras = Coalesce(LookUp(colEquipo; Area = "Compras").Title; "Compras");;
+frPersonaBodega = Coalesce(LookUp(colEquipo; Area = "Bodega").Title; "Bodega");;
+frPersonaProveedores = Coalesce(LookUp(colEquipo; Area = "Proveedores").Title; "Atención a proveedores");;
+frPersonaPagos = Coalesce(LookUp(colEquipo; Area = "Pagos").Title; "Cuentas por pagar");;
+frEmailCompras = Concat(Filter(colEquipo; Area = "Compras"); Email; ";");;
+frEmailBodega = Concat(Filter(colEquipo; Area = "Bodega"); Email; ";");;
+frEmailProveedores = Concat(Filter(colEquipo; Area = "Proveedores"); Email; ";");;
+frEmailPagos = Concat(Filter(colEquipo; Area = "Pagos"); Email; ";");;
+
+// Opciones del selector: primero el usuario, luego el resto del equipo
+frOpcionesVista =
+    ForAll(
+        Ungroup(
+            Table(
+                {g: Table({Nombre: Coalesce(frYo.Title; User().FullName); Area: frMiArea; Email: varEmail})};
+                {g: ForAll(Filter(colEquipo; Lower(Email) <> varEmail) As e; {Nombre: e.Title; Area: e.Area; Email: Lower(e.Email)})}
+            );
+            'g'
+        ) As v;
+        {
+            Nombre: v.Nombre;
+            Area: v.Area;
+            Email: v.Email;
+            Etiqueta: v.Nombre & " · " & Switch(v.Area; "Proveedores"; "Atención a proveedores"; "Pagos"; "Cuentas por pagar"; v.Area) & If(v.Email = varEmail; " (tú)"; "")
+        }
+    );;
+
+// Firma que acompaña cada registro del historial
+frFirma = {Area: varVistaArea; RegistradoPor: User().FullName; RegistradoEmail: varEmail; EnNombreDe: varVistaNombre};;
+
+// Catálogo + proveedores ya usados en POs (columna Value)
+frListaProveedores =
+    Sort(
+        Distinct(
+            Ungroup(
+                Table(
+                    {g: ForAll(colProveedores As p; {Nombre: p.Title})};
+                    {g: ForAll(Filter(colOrdenes; !IsBlank(Proveedor)) As o; {Nombre: o.Proveedor})}
+                );
+                'g'
+            );
+            Nombre
+        );
+        Value
+    );;
+
+// ============================================================
+// 4. ÓRDENES CALCULADAS (una fila por PO cargada)
+// ============================================================
+frOrdenes =
+    ForAll(colOrdenes As o;
+        With(
+            {
+                fRef: Switch(o.Etapa;
+                    "Solicitada"; o.FechaSolicitud;
+                    "Esperando factura"; o.FechaRecepcion;
+                    "Factura sin recepción"; o.FechaFactura;
+                    "Pendiente 101"; If(o.FechaFactura > o.FechaRecepcion; o.FechaFactura; o.FechaRecepcion);
+                    "En crédito"; o.Fecha101;
+                    o.FechaPago);
+                alertaFac: o.Etapa = "Esperando factura" And !IsBlank(o.FechaAlertaFactura) And varHoy >= o.FechaAlertaFactura;
+                atraso101: o.Etapa = "Pendiente 101" And !IsBlank(o.FechaLimite101) And varHoy > o.FechaLimite101;
+                pagoVencido: o.Etapa = "En crédito" And !IsBlank(o.FechaPagoEstimada) And varHoy >= o.FechaPagoEstimada;
+                llam: Coalesce(o.Llamadas; 0)
+            };
+            With(
+                {
+                    dias: If(IsBlank(fRef) Or fRef >= varHoy; 0;
+                        CountRows(Filter(ForAll(Sequence(DateDiff(fRef; varHoy; TimeUnit.Days)) As s; {F: DateAdd(fRef; s.Value; TimeUnit.Days)}); Weekday(F; StartOfWeek.Monday) <= 5)));
+                    nivel: Switch(o.Etapa;
+                        "Pagada"; "ok";
+                        "En crédito"; If(pagoVencido; "warn"; "info");
+                        "Factura sin recepción"; If(varHoy > o.FechaFactura; "crit"; "warn");
+                        "Pendiente 101"; If(atraso101; "crit"; "warn");
+                        "Esperando factura"; If(alertaFac; "crit"; "info");
+                        "neutral");
+                    resp: Switch(o.Etapa;
+                        "Solicitada"; "Bodega";
+                        "Factura sin recepción"; "Bodega";
+                        "Pendiente 101"; "Compras";
+                        "En crédito"; "Pagos";
+                        "Esperando factura"; If(alertaFac Or llam > 0; "Proveedores"; "Proveedor");
+                        "")
+                };
+                {
+                    ID: o.ID;
+                    PO: o.Title;
+                    Proveedor: o.Proveedor;
+                    Descripcion: o.Descripcion;
+                    Cantidad: o.Cantidad;
+                    NumFactura: o.NumFactura;
+                    FechaSolicitud: o.FechaSolicitud;
+                    UltimoMovimiento: o.UltimoMovimiento;
+                    Etapa: o.Etapa;
+                    Nivel: nivel;
+                    NivelOrden: Switch(nivel; "crit"; 0; "warn"; 1; "info"; 2; "neutral"; 3; 4);
+                    Dias: dias;
+                    Resp: resp;
+                    RespNombre: Switch(resp;
+                        "Bodega"; frPersonaBodega & " (Bodega)";
+                        "Compras"; frPersonaCompras & " (Compras)";
+                        "Proveedores"; frPersonaProveedores & " (Atención a proveedores)";
+                        "Pagos"; frPersonaPagos;
+                        "Proveedor"; "Proveedor";
+                        "");
+                    Accion: Switch(o.Etapa;
+                        "Solicitada"; "Confirmar ingreso del producto en bodega";
+                        "Factura sin recepción"; "Confirmar si el producto llegó a bodega";
+                        "Pendiente 101"; If(atraso101; "101 atrasado: " & dias & " días hábiles"; "Dar el 101 en el sistema");
+                        "En crédito"; If(pagoVencido; "Pago vencido desde el "; "Pago estimado el ") & Text(o.FechaPagoEstimada; "dd/mm/yyyy");
+                        "Esperando factura";
+                            If(alertaFac;
+                                If(llam > 0; "Volver a llamar al proveedor"; "Llamar al proveedor: " & dias & " días hábiles sin factura");
+                                If(llam > 0; "En seguimiento: próxima llamada el "; "Plazo del proveedor hasta el ") & Text(o.FechaAlertaFactura; "dd/mm"));
+                        "Pagada el " & Text(o.FechaPago; "dd/mm/yyyy"));
+                    Llamadas: llam;
+                    Rechazos: Coalesce(o.Rechazos; 0);
+                    HRec: !IsBlank(o.FechaRecepcion);
+                    HFac: !IsBlank(o.FechaFactura);
+                    H101: !IsBlank(o.Fecha101);
+                    HPag: !IsBlank(o.FechaPago);
+                    DiasRecFac: If(IsBlank(o.FechaRecepcion) Or IsBlank(o.FechaFactura) Or o.FechaFactura <= o.FechaRecepcion; 0;
+                        CountRows(Filter(ForAll(Sequence(DateDiff(o.FechaRecepcion; o.FechaFactura; TimeUnit.Days)) As s; {F: DateAdd(o.FechaRecepcion; s.Value; TimeUnit.Days)}); Weekday(F; StartOfWeek.Monday) <= 5)));
+                    DiasFac101: If(IsBlank(o.FechaFactura) Or IsBlank(o.Fecha101) Or o.Fecha101 <= o.FechaFactura; 0;
+                        CountRows(Filter(ForAll(Sequence(DateDiff(o.FechaFactura; o.Fecha101; TimeUnit.Days)) As s; {F: DateAdd(o.FechaFactura; s.Value; TimeUnit.Days)}); Weekday(F; StartOfWeek.Monday) <= 5)));
+                    Busqueda: Lower(o.Title & " " & o.Proveedor & " " & o.Descripcion & " " & o.NumFactura & " " & o.Etapa)
+                }
+            )
+        )
+    );;
+
+// ============================================================
+// 5. PESTAÑA ÓRDENES: FILTROS
+// ============================================================
+frOrdenesFiltradas =
+    SortByColumns(
+        Filter(frOrdenes;
+            (varEtapaFiltro = "Todas" Or Etapa = varEtapaFiltro) And
+            Switch(varChip;
+                "pendientes"; Etapa <> "Pagada";
+                "mias"; Etapa <> "Pagada" And Resp <> "Proveedor" And Resp <> "" And (varVistaArea = "Admin" Or Resp = varVistaArea);
+                "alerta"; Nivel = "crit";
+                "pagadas"; Etapa = "Pagada";
+                true) And
+            (IsBlank(Trim(varBuscar)) Or Lower(Trim(varBuscar)) in Busqueda)
+        );
+        "NivelOrden"; SortOrder.Ascending;
+        "UltimoMovimiento"; SortOrder.Descending
+    );;
+
+frChips =
+    ForAll(
+        Table(
+            {Clave: "pendientes"; Texto: "Pendientes"};
+            {Clave: "mias"; Texto: "Mis pendientes"};
+            {Clave: "alerta"; Texto: "Con alerta"};
+            {Clave: "pagadas"; Texto: "Pagadas"};
+            {Clave: "todas"; Texto: "Todas"}
+        ) As c;
+        {
+            Clave: c.Clave;
+            Texto: c.Texto;
+            Conteo: CountIf(frOrdenes;
+                (varEtapaFiltro = "Todas" Or Etapa = varEtapaFiltro) And
+                Switch(c.Clave;
+                    "pendientes"; Etapa <> "Pagada";
+                    "mias"; Etapa <> "Pagada" And Resp <> "Proveedor" And Resp <> "" And (varVistaArea = "Admin" Or Resp = varVistaArea);
+                    "alerta"; Nivel = "crit";
+                    "pagadas"; Etapa = "Pagada";
+                    true))
+        }
+    );;
+
+// ============================================================
+// 6. PESTAÑA PANEL
+// ============================================================
+frEtapas =
+    Table(
+        {Clave: "Todas"; Resp: ""};
+        {Clave: "Solicitada"; Resp: "Bodega"};
+        {Clave: "Esperando factura"; Resp: "Proveedores"};
+        {Clave: "Factura sin recepción"; Resp: "Bodega"};
+        {Clave: "Pendiente 101"; Resp: "Compras"};
+        {Clave: "En crédito"; Resp: "Pagos"};
+        {Clave: "Pagada"; Resp: ""}
+    );;
+
+frConteoEtapas =
+    ForAll(frEtapas As e;
+        {
+            Clave: e.Clave;
+            Titulo: If(e.Clave = "Todas"; "Todas las PO"; e.Clave);
+            Total: If(e.Clave = "Todas"; CountRows(frOrdenes); CountIf(frOrdenes; Etapa = e.Clave));
+            Alertas: If(e.Clave = "Todas"; CountIf(frOrdenes; Nivel = "crit"); CountIf(frOrdenes; Etapa = e.Clave And Nivel = "crit"));
+            Sub: Switch(e.Resp;
+                "Bodega"; frPersonaBodega;
+                "Proveedores"; frPersonaProveedores;
+                "Compras"; frPersonaCompras;
+                "Pagos"; frPersonaPagos;
+                If(e.Clave = "Todas"; "Activas y cerradas"; "Proceso cerrado"))
+        }
+    );;
+
+frCola =
+    SortByColumns(
+        Filter(frOrdenes; Etapa <> "Pagada" And Resp <> "Proveedor" And Resp <> "" And (varVistaArea = "Admin" Or Resp = varVistaArea));
+        "NivelOrden"; SortOrder.Ascending;
+        "Dias"; SortOrder.Descending
+    );;
+
+frTituloPanel =
+    If(varVistaArea = "Admin"; "Pendientes de todo el equipo";
+       varVistaArea = "Consulta"; "Vista de consulta";
+       "Pendientes de " & varVistaNombre & " · " & frAreaVista);;
+
+frIndicadores =
+    With(
+        {
+            nAl: CountIf(frOrdenes; Nivel = "crit");
+            rf: Filter(frOrdenes; HRec And HFac);
+            f1: Filter(frOrdenes; HFac And H101)
+        };
+        Table(
+            {Nombre: "Órdenes con alerta"; Valor: Text(nAl); Critico: nAl > 0};
+            {Nombre: "Promedio recepción → factura (días háb.)"; Valor: If(CountRows(rf) = 0; "—"; Text(Round(Average(rf; DiasRecFac); 1))); Critico: false};
+            {Nombre: "Promedio factura → 101 (días háb.)"; Valor: If(CountRows(f1) = 0; "—"; Text(Round(Average(f1; DiasFac101); 1))); Critico: false};
+            {Nombre: "Llamadas a proveedores"; Valor: Text(Sum(frOrdenes; Llamadas)); Critico: false};
+            {Nombre: "Facturas rechazadas"; Valor: Text(Sum(frOrdenes; Rechazos)); Critico: false};
+            {Nombre: "Órdenes pagadas (90 días)"; Valor: Text(CountIf(frOrdenes; Etapa = "Pagada")); Critico: false}
+        )
+    );;
+
+// ============================================================
+// 7. PO SELECCIONADA (varPOId = 0 significa ninguna)
+// ============================================================
+frPORaw = LookUp(colOrdenes; ID = varPOId);;
+frPO = LookUp(frOrdenes; ID = varPOId);;
+
+frDatosPO =
+    Table(
+        {Etq: "Proveedor"; Val: frPORaw.Proveedor};
+        {Etq: "Descripción"; Val: frPORaw.Descripcion};
+        {Etq: "Cantidad"; Val: Coalesce(frPORaw.Cantidad; "—")};
+        {Etq: "Fecha de solicitud"; Val: Text(frPORaw.FechaSolicitud; "dd/mm/yyyy")};
+        {Etq: "PDF de la PO"; Val: Coalesce(frPORaw.PdfUrl; "Sin PDF")};
+        {Etq: "Crédito"; Val: Text(Coalesce(frPORaw.DiasCredito; frDiasCredito)) & " días"};
+        {Etq: "Factura"; Val: Coalesce(frPORaw.NumFactura; "—") & If(Coalesce(frPORaw.Rechazos; 0) > 0; "  ·  " & frPORaw.Rechazos & " rechazo(s)"; "")};
+        {Etq: "Llamadas"; Val: Text(Coalesce(frPORaw.Llamadas; 0)) & If(IsBlank(frPORaw.FechaUltLlamada); ""; "  ·  última " & Text(frPORaw.FechaUltLlamada; "dd/mm"))}
+    );;
+
+frAcciones =
+    With(
+        {
+            r: frPORaw;
+            principal: Switch(frPO.Etapa;
+                "Solicitada"; "recepcion";
+                "Factura sin recepción"; "recepcion";
+                "Pendiente 101"; "m101";
+                "En crédito"; "pago";
+                "Esperando factura"; If(frPO.Nivel = "crit"; "llamada"; "factura");
+                "")
+        };
+        ForAll(
+            Filter(
+                Table(
+                    {Clave: "recepcion"; Texto: "Confirmar recepción en bodega"; Roles: "Bodega"; Aplica: IsBlank(r.FechaRecepcion)};
+                    {Clave: "factura"; Texto: "Registrar factura"; Roles: "Bodega,Proveedores"; Aplica: IsBlank(r.FechaFactura) And IsBlank(r.FechaPago)};
+                    {Clave: "llamada"; Texto: "Registrar llamada"; Roles: "Proveedores"; Aplica: IsBlank(r.FechaFactura) And IsBlank(r.FechaPago)};
+                    {Clave: "m101"; Texto: "Confirmar 101"; Roles: "Compras"; Aplica: !IsBlank(r.FechaRecepcion) And IsBlank(r.Fecha101)};
+                    {Clave: "rechazo"; Texto: "Rechazar factura"; Roles: "Compras,Proveedores,Pagos"; Aplica: !IsBlank(r.FechaFactura) And IsBlank(r.FechaPago)};
+                    {Clave: "pago"; Texto: "Registrar pago"; Roles: "Pagos"; Aplica: !IsBlank(r.Fecha101) And !IsBlank(r.FechaFactura) And IsBlank(r.FechaPago)};
+                    {Clave: "editar"; Texto: "Editar datos de la PO"; Roles: "Compras"; Aplica: IsBlank(r.FechaPago)};
+                    {Clave: "nota"; Texto: "Agregar nota"; Roles: "Todos"; Aplica: true}
+                );
+                Aplica
+            ) As a;
+            {
+                Clave: a.Clave;
+                Texto: a.Texto;
+                Principal: a.Clave = principal;
+                Habilitada: frPuedeActuar And (varVistaArea = "Admin" Or a.Roles = "Todos" Or varVistaArea in Split(a.Roles; ","))
+            }
+        )
+    );;
+
+frHintAcciones =
+    If(
+        frMiArea = "Consulta"; "Tu usuario no tiene un área asignada. Pide al administrador que te agregue en Reglas de días › Equipo.";
+        !frPuedeActuar; "Estás viendo la vista de " & varVistaNombre & ". Solo esa persona registra estas acciones.";
+        CountIf(frAcciones; !Habilitada) > 0; "Las acciones en gris le corresponden a otra área.";
+        ""
+    );;
+
+frAvisoForm =
+    Switch(varAccion;
+        "recepcion"; If(frPO.HFac;
+            "La factura ya está en el sistema: se avisará a " & frPersonaCompras & " para dar el 101.";
+            "Se avisará a " & frPersonaCompras & " y " & frPersonaProveedores & ". Si en " & frDiasAlerta & " días hábiles no hay factura, " & frPersonaProveedores & " recibe la alerta.");
+        "factura"; If(frPO.HRec;
+            "Se avisará a " & frPersonaCompras & " para dar el 101.";
+            "No hay recepción en bodega: se generará un ticket a " & frPersonaBodega & ".");
+        "llamada"; "La llamada no cambia el estatus; reinicia el conteo para la siguiente llamada.";
+        "m101"; If(frPO.HFac; "Con la factura en el sistema, la orden pasa a pago."; "Aún no hay factura: la orden sigue esperando factura.");
+        "rechazo"; "La factura se quita de la orden y " & frPersonaProveedores & " recibe aviso para pedir una corregida.";
+        "pago"; "Cierra el proceso de esta orden.";
+        "Queda en el historial de la orden."
+    ) & " Se registra con fecha " & Text(varHoy; "dd/mm/yyyy") & " a nombre de " & varVistaNombre & ".";;
+
+frTiempos =
+    "Recepción → factura: " & If(frPO.HRec And frPO.HFac; frPO.DiasRecFac & " días háb."; "—") &
+    "     Factura → 101: " & If(frPO.HFac And frPO.H101; frPO.DiasFac101 & " días háb."; "—") &
+    "     Llamadas: " & frPO.Llamadas;;
+
+frHtmlHitos =
+    With(
+        {
+            r: frPORaw;
+            idx: If(IsBlank(frPORaw.FechaRecepcion); 2; IsBlank(frPORaw.FechaFactura); 3; IsBlank(frPORaw.Fecha101); 4; IsBlank(frPORaw.FechaPago); 5; 0);
+            cAct: If(frPO.Nivel = "crit"; hxCrit; hxAcento)
+        };
+        "<div style='display:flex;gap:8px;font-family:Segoe UI,sans-serif;font-size:12px'>" &
+        Concat(
+            Table(
+                {I: 1; N: "Solicitud"; F: r.FechaSolicitud; X: frPersonaCompras};
+                {I: 2; N: "Recepción"; F: r.FechaRecepcion; X: r.TipoRecepcion};
+                {I: 3; N: "Factura"; F: r.FechaFactura; X: r.NumFactura};
+                {I: 4; N: "101"; F: r.Fecha101; X: r.Doc101};
+                {I: 5; N: "Pago"; F: r.FechaPago; X: r.RefPago}
+            );
+            "<div style='flex:1;min-width:0'>" &
+            "<div style='height:6px;border-radius:3px;background:" & If(!IsBlank(F); hxOk; I = idx; cAct; hxBorde) & "'></div>" &
+            "<div style='margin-top:6px;font-weight:600;color:" & hxTexto & "'>" & N & "</div>" &
+            "<div style='color:" & hxTexto2 & "'>" & If(IsBlank(F); If(I = idx; "En curso"; "Pendiente"); Text(F; "dd/mm") & If(IsBlank(X); ""; " · " & X)) & "</div></div>"
+        ) &
+        "</div>"
+    );;
+
+frHistChips =
+    Table(
+        {Clave: "todo"; Texto: "Todo"; Conteo: CountRows(colHist)};
+        {Clave: "equipo"; Texto: "Registros del equipo"; Conteo: CountIf(colHist; Tipo <> "Aviso")};
+        {Clave: "avisos"; Texto: "Avisos automáticos"; Conteo: CountIf(colHist; Tipo = "Aviso")}
+    );;
+
+frHist =
+    Filter(colHist;
+        varFiltroHist = "todo" Or
+        (varFiltroHist = "avisos" And Tipo = "Aviso") Or
+        (varFiltroHist = "equipo" And Tipo <> "Aviso")
+    );;
+
+// ============================================================
+// 8. PESTAÑA REGLAS: GUÍA DEL FLUJO
+// ============================================================
+frHtmlGuia =
+    "<ol style='font-family:Segoe UI,sans-serif;font-size:13px;color:" & hxTexto & ";padding-left:18px;margin:0;line-height:1.55'>" &
+    "<li><b>" & frPersonaCompras & " registra la PO.</b> PO, proveedor, descripción, cantidad, crédito y PDF opcional.</li>" &
+    "<li><b>" & frPersonaBodega & " confirma el ingreso en bodega.</b> Empieza el plazo de la factura.</li>" &
+    "<li><b>Pasan " & frDiasAlerta & " días hábiles sin factura.</b> Aviso a " & frPersonaProveedores & " para llamar.</li>" &
+    "<li><b>" & frPersonaProveedores & " registra cada llamada.</b> No cambia el estatus; si en " & frDiasRellamada & " días hábiles no llega, vuelve a llamar.</li>" &
+    "<li><b>La factura entra al sistema.</b> La registran " & frPersonaBodega & " o " & frPersonaProveedores & ".</li>" &
+    "<li><b>" & frPersonaCompras & " da el 101.</b> Alerta si tarda más de " & frDias101 & " días hábiles.</li>" &
+    "<li><b>" & frPersonaPagos & " registra el pago.</b> Se cierra la orden.</li></ol>";;
+    ----- fin código -----
+
+
+--- App.OnStart (reemplazar completo) -------------------------------------
+
+    ----- inicio código (powerfx) -----
+// ===================== USUARIO Y FECHA DE TRABAJO =====================
+Set(varEmail; Lower(Trim(User().Email)));;
+Set(varHoy; Today());;
+
+// ===================== DATOS: CARGA EN PARALELO Y DELEGABLE =====================
+Concurrent(
+    ClearCollect(colOrdenes;
+        Filter(TRZ_OrdenesCompra; Cerrada = 0 Or FechaPago >= DateAdd(Today(); -90; TimeUnit.Days))
+    );
+    ClearCollect(colEquipo; Filter(TRZ_Equipo; Activo = true));
+    ClearCollect(colProveedores; Sort(Filter(TRZ_Proveedores; Activo = true); Title; SortOrder.Ascending));
+    ClearCollect(colConfig; FirstN(TRZ_Config; 1))
+);;
+
+// ===================== VISTA INICIAL = EL USUARIO QUE ABRE LA APP =====================
+Set(varVistaEmail; varEmail);;
+Set(varVistaNombre; Coalesce(LookUp(colEquipo; Lower(Email) = varEmail).Title; User().FullName));;
+Set(varVistaArea; Coalesce(LookUp(colEquipo; Lower(Email) = varEmail).Area; "Consulta"));;
+
+// ===================== NAVEGACIÓN, FILTROS Y ESTADO =====================
+Set(varTab; "panel");;
+Set(varChip; "pendientes");;
+Set(varEtapaFiltro; "Todas");;
+Set(varBuscar; "");;
+Set(varPOId; 0);;
+Set(varAccion; "");;
+Set(varFiltroHist; "todo");;
+Set(varModalPO; false);;
+Set(varModoPO; "nueva");;
+Set(varModoProv; "lista");;
+Set(varErrPO; "");;
+Set(varGuardando; false);;
+
+// ===================== HISTORIAL: ESQUEMA FIJADO Y VACÍO =====================
+ClearCollect(colHist; FirstN(TRZ_HistorialPO; 1));;
+Clear(colHist)
+    ----- fin código -----
+
+
+varPOAct (la PO leída de nuevo antes de guardar) y varRes (lo que devuelve el Patch), igual que varCambios en la edición, se asignan en cada botón de guardar, siempre antes de usarse.
+
+
+******************************************************************************
+PARTE 3 · JERARQUÍA COMPLETA DE scrTraza (contenedores, controles y propiedades)
+******************************************************************************
+
+
+##############################################################################
+# 0. Cómo leer y árbol completo
+##############################################################################
+
+Cada tabla es un contenedor o un grupo de controles hermanos. Columna Control = nombre exacto; Propiedad = nombre tal como aparece en la lista de propiedades de Power Apps; Valor = lo que se pega en la barra de fórmulas, empezando con =.
+
+Reglas de construcción:
+
+- Usa Contenedor vertical u horizontal (no el contenedor libre) para todo lo que diga "vertical" u "horizontal".
+- Dentro de un contenedor con diseño, X e Y no se usan. El tamaño lo deciden FillPortions (0 = tamaño fijo; 1 o más = flexible), Width, Height, LayoutMinWidth y AlignInContainer.
+- Dentro de una plantilla de galería sí se usan X, Y, Width y Height.
+- Orden en la vista de árbol: dentro de un contenedor con diseño, de arriba hacia abajo = de primero a último en pantalla. En la pantalla y en las plantillas de galería, el de arriba queda al frente.
+- Fuente de todos los textos: =Font.'Segoe UI', salvo donde diga Font.'Courier New'.
+- Para crear rápido controles con el mismo estilo, configura el primero, cópialo (Ctrl+C, Ctrl+V) y cámbiale el nombre y las propiedades que difieren.
+
+Cambios respecto a la sección 4 de la Guía general: conDetContenido se elimina (sus secciones van directo en conDetalle para que el desplazamiento funcione) y se agregan conSigCaja, conFormCaja, conPlazosHead, lblPlazosSub, lblEtFondo, rctColaDiv, rctIndDiv, rctEqDiv, lblProvNota, lblHistVacio y los textos de cada fila de plazos.
+
+
+--- Árbol completo --------------------------------------------------------
+
+- scrTraza (Pantalla)
+  - conModalPO (Contenedor vertical, primero en el árbol para quedar al frente)
+    - conModalCaja (vertical)
+      - lblModalTit (Etiqueta)
+      - conMPO (horizontal)
+        - conMPONum (vertical): lblMPO (Etiqueta), txtPO (Entrada de texto)
+        - conMPOFecha (vertical): lblMFecha (Etiqueta), dpFechaSolicitud (Selector de fecha)
+      - conMProvHead (horizontal): lblMProv (Etiqueta), btnProvLista (Botón), btnProvTexto (Botón)
+      - cmbProveedor (Cuadro combinado)
+      - txtProveedor (Entrada de texto)
+      - lblMDesc (Etiqueta)
+      - txtDescripcion (Entrada de texto)
+      - conMNums (horizontal)
+        - conMCant (vertical): lblMCant, txtCantidad
+        - conMCred (vertical): lblMCred, txtDiasCredito
+      - lblMPdf (Etiqueta)
+      - txtPdf (Entrada de texto)
+      - lblErrPO (Etiqueta)
+      - conModalBtns (horizontal): btnCancelarPO, btnGuardarPO
+  - conRaiz (vertical)
+    - conHeader (vertical)
+      - conHeaderTop (horizontal)
+        - lblSello (Etiqueta)
+        - conMarca (vertical): lblTitulo, lblSubtitulo
+        - conQuien (horizontal)
+          - imgAvatar (Imagen)
+          - conQuienTxt (vertical): lblQuienEtq (Etiqueta), drpVista (Cuadro combinado MODERNO)
+        - icoRefrescar (Icono)
+        - btnNuevaPO (Botón)
+      - conTabs (horizontal): btnTabPanel, btnTabOrdenes, btnTabReglas, lblTabEspacio, lblSimulando, lblModo, tmrRefresco (Temporizador)
+    - conPanel (vertical)
+      - conSaludo (horizontal)
+        - conSaludoTxt (vertical): lblFechaHoy, lblTituloPanel
+        - btnVerOrdenes
+      - conEtapas (vertical)
+        - galEtapas (Galería horizontal en blanco): lblEtNum, lblEtNom, lblEtSub, rctEtAlerta (Rectángulo), lblEtFondo
+      - conPanelGrid (horizontal)
+        - conCola (vertical)
+          - conColaHead (horizontal): lblColaTit, lblColaCnt
+          - galCola (Galería vertical en blanco): lblColaPill, lblColaAccion, lblColaPO, rctColaSev, rctColaDiv
+          - lblColaVacia
+        - conIndic (vertical)
+          - lblIndTit
+          - galIndicadores (Galería vertical en blanco): lblIndNom, lblIndVal, rctIndDiv
+    - conOrdenes (vertical)
+      - conFiltros (horizontal): txtBuscar, lblEtapaEtq, drpEtapa, btnLimpiarFiltros
+      - conChips (horizontal): galChips (Galería horizontal en blanco): btnChip; lblConteo
+      - conOrdGrid (horizontal)
+        - conLista (vertical)
+          - conCab (horizontal): lblCabPO, lblCabProv, lblCabEst, lblCabSig, lblCabDias
+          - galOrdenes (Galería vertical en blanco)
+            - btnFilaSel (Botón, primero = al frente)
+            - rctFilaDiv (Rectángulo)
+            - conFila (horizontal)
+              - rctFilaSev (Rectángulo)
+              - conFilaPO (vertical): lblFilaPO, lblFilaFecha
+              - conFilaProv (vertical): lblFilaProv, lblFilaDesc
+              - conFilaEst (vertical): lblFilaPill, htmlMiniBarra (Texto HTML)
+              - conFilaSig (vertical): lblFilaAccion, lblFilaResp
+              - conFilaDias (vertical): lblFilaDias, lblFilaDiasEtq
+          - lblListaVacia
+        - conDetalle (vertical)
+          - conDetVacio (vertical): lblDetVacioEtq, lblDetVacioTit, lblDetVacioTxt
+          - conDetHead (horizontal)
+            - conDetPO (vertical): lblDetEtq, lblDetPO
+            - lblDetPill
+            - btnDetCerrar
+          - conDatos (vertical): galDatosPO (Galería vertical en blanco): lblDatoEtq, lblDatoVal; btnAbrirPdf
+          - conSiguiente (horizontal)
+            - conSigCaja (horizontal): rctSigSev (Rectángulo), conSigTxt (vertical): lblSigAccion, lblSigResp
+          - conHitos (vertical): htmlHitos (Texto HTML), lblTiempos
+          - conAcciones (vertical): lblAccEtq, galAcciones (Galería vertical en blanco): btnAccion; lblAccHint
+          - conFormAccion (vertical)
+            - conFormCaja (vertical)
+              - lblFormTit
+              - conF_Recepcion (vertical): lblF_Recepcion, drpTipoRecepcion
+              - conF_Factura (vertical): lblF_Factura, txtNumFactura
+              - conF_Llamada (horizontal)
+                - conF_LlamadaA (vertical): lblF_Resultado, drpResultadoLlamada
+                - conF_LlamadaB (vertical): lblF_Compromiso, dpCompromiso
+              - conF_101 (vertical): lblF_101, txtDoc101
+              - conF_Rechazo (vertical): lblF_Rechazo, drpMotivoRechazo
+              - conF_Pago (vertical): lblF_Pago, txtRefPago
+              - conF_Nota (vertical): lblF_Nota, txtNotaAccion
+              - lblFormAviso
+              - conFormBtns (horizontal): btnCancelarAccion, btnGuardarRecepcion, btnGuardarFactura, btnGuardarLlamada, btnGuardar101, btnGuardarRechazo, btnGuardarPago, btnGuardarNota
+          - conHist (vertical)
+            - conHistHead (horizontal): lblHistTit, galHistChips (Galería horizontal en blanco): btnHistChip
+            - galHist (Galería vertical de alto flexible): lblHistMeta, lblHistDetalle, cirHist (Círculo), rctHistLinea
+            - lblHistVacio
+    - conReglas (vertical)
+      - conReglasGrid (horizontal)
+        - conColIzq (vertical)
+          - conPlazos (vertical)
+            - conPlazosHead (horizontal): lblPlazosTit, lblPlazosSub
+            - conPlazoAlerta (horizontal): conPlazoAlertaTxt (vertical): lblPlazoAlertaTit, lblPlazoAlertaDesc; txtCfgAlerta; lblPlazoAlertaUni
+            - conPlazoRellamada (horizontal): conPlazoRellamadaTxt (vertical): lblPlazoRellamadaTit, lblPlazoRellamadaDesc; txtCfgRellamada; lblPlazoRellamadaUni
+            - conPlazo101 (horizontal): conPlazo101Txt (vertical): lblPlazo101Tit, lblPlazo101Desc; txtCfg101; lblPlazo101Uni
+            - conPlazoCredito (horizontal): conPlazoCreditoTxt (vertical): lblPlazoCreditoTit, lblPlazoCreditoDesc; txtCfgCredito; lblPlazoCreditoUni
+            - conPlazosPie (horizontal): lblPlazosNota, btnGuardarPlazos
+          - conEquipo (vertical)
+            - lblEquipoTit
+            - galEquipo (Galería vertical en blanco): icoEqQuitar, lblEqNombre, lblEqArea, lblEqEmail, rctEqDiv
+            - conEqNuevo (horizontal): txtEqNombre, txtEqEmail, drpEqArea, btnEqAgregar
+        - conColDer (vertical)
+          - conProveedores (vertical)
+            - lblProvTit
+            - galProveedores (Galería vertical en blanco): icoProvQuitar, lblProvNom
+            - conProvNuevo (horizontal): txtNuevoProv, btnAgregarProv
+            - lblProvNota
+          - conGuia (vertical): lblGuiaTit, htmlGuia (Texto HTML)
+          - conPruebas (vertical)
+            - lblPruebasTit
+            - conPruebasFila (horizontal): dpFechaTrabajo, btnHoyReal
+            - lblPruebasNota
+
+
+--- scrTraza y conRaiz ----------------------------------------------------
+
+
+  [scrTraza]
+      Fill: =ColorValue(hxFondo)
+      LoadingSpinner: =LoadingSpinner.Data
+      LoadingSpinnerColor: =ColorValue(hxAcento)
+
+  [conRaiz]
+      X: =0
+      Y: =0
+      Width: =Parent.Width
+      Height: =Parent.Height
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =0
+      LayoutWrap: =false
+      LayoutOverflowY: =LayoutOverflow.Hide
+      PaddingTop: =0
+      PaddingBottom: =0
+      PaddingLeft: =0
+      PaddingRight: =0
+      Fill: =RGBA(0; 0; 0; 0)
+      BorderThickness: =0
+      DropShadow: =DropShadow.None
+      Visible: =true
+
+
+##############################################################################
+# 1. conHeader (encabezado)
+##############################################################################
+
+Va dentro de conRaiz, primero. Contiene la marca, el selector "Trabajando como", el botón + Nueva PO y las tres pestañas.
+
+
+--- conHeader y conHeaderTop ----------------------------------------------
+
+
+  [conHeader]
+      FillPortions: =0
+      Height: =112
+      AlignInContainer: =AlignInContainer.SetByContainer
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =6
+      PaddingTop: =12
+      PaddingBottom: =0
+      PaddingLeft: =16
+      PaddingRight: =16
+      Fill: =ColorValue(hxTinta)
+      BorderThickness: =0
+      DropShadow: =DropShadow.None
+
+  [conHeaderTop]
+      FillPortions: =0
+      Height: =56
+      AlignInContainer: =AlignInContainer.SetByContainer
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =14
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =0 en las cuatro
+      Fill: =RGBA(0; 0; 0; 0)
+      BorderThickness: =0
+
+
+--- Controles de conHeaderTop ---------------------------------------------
+
+
+  [lblSello]
+      FillPortions: =0
+      Width: =40
+      Height: =40
+      AlignInContainer: =AlignInContainer.Center
+      Text: ="PO"
+      Font: =Font.'Courier New'
+      Size: =12
+      FontWeight: =FontWeight.Semibold
+      Color: =Color.White
+      Fill: =RGBA(255; 255; 255; 0,12)
+      Align: =Align.Center
+      VerticalAlign: =VerticalAlign.Middle
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+
+  [conMarca]
+      FillPortions: =1
+      LayoutMinWidth: =240
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Center
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =0
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [lblTitulo]
+      FillPortions: =0
+      Height: =28
+      Text: ="Trazabilidad de Compras"
+      Font: =Font.'Segoe UI'
+      Size: =17
+      FontWeight: =FontWeight.Bold
+      Color: =Color.White
+      VerticalAlign: =VerticalAlign.Bottom
+      PaddingLeft / PaddingTop / PaddingBottom: =0 en las tres
+
+  [lblSubtitulo]
+      FillPortions: =0
+      Height: =22
+      Text: ="Orden de compra → bodega → factura → 101 → pago"
+      Size: =10
+      Color: =RGBA(255; 255; 255; 0,75)
+      VerticalAlign: =VerticalAlign.Top
+      PaddingLeft: =0
+
+  [conQuien]
+      FillPortions: =0
+      Width: =330
+      Height: =48
+      AlignInContainer: =AlignInContainer.Center
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =10
+      PaddingLeft: =8
+      PaddingRight: =8
+      PaddingTop / PaddingBottom: =0 en las dos
+      Fill: =RGBA(255; 255; 255; 0,09)
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =10 en las cuatro
+      BorderThickness: =0
+
+  [imgAvatar]
+      FillPortions: =0
+      Width: =32
+      Height: =32
+      AlignInContainer: =AlignInContainer.Center
+      Image: =User().Image
+      ImagePosition: =ImagePosition.Fill
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =16 en las cuatro
+      Visible: =varVistaEmail = varEmail
+
+  [conQuienTxt]
+      FillPortions: =1
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Center
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =0
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [lblQuienEtq]
+      FillPortions: =0
+      Height: =14
+      Text: ="TRABAJANDO COMO"
+      Size: =7
+      FontWeight: =FontWeight.Semibold
+      Color: =RGBA(255; 255; 255; 0,8)
+      VerticalAlign: =VerticalAlign.Bottom
+      PaddingLeft: =6
+      PaddingTop / PaddingBottom: =0 en las dos
+
+  [icoRefrescar]
+      FillPortions: =0
+      Width: =40
+      Height: =40
+      AlignInContainer: =AlignInContainer.Center
+      Icon: =Icon.Reset
+      Color: =Color.White
+      HoverColor: =Color.White
+      Fill: =RGBA(0; 0; 0; 0)
+      HoverFill: =RGBA(255; 255; 255; 0,12)
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =9 en las cuatro
+      Tooltip: ="Actualizar datos"
+      OnSelect: código 1.2
+
+  [btnNuevaPO]
+      FillPortions: =0
+      Width: =140
+      Height: =40
+      AlignInContainer: =AlignInContainer.Center
+      Text: ="+ Nueva PO"
+      Font: =Font.'Segoe UI'
+      Size: =12
+      FontWeight: =FontWeight.Semibold
+      Fill: =Color.White
+      Color: =ColorValue(hxTinta)
+      HoverFill: =RGBA(255; 255; 255; 0,85)
+      HoverColor: =ColorValue(hxTinta)
+      PressedFill: =ColorValue(hxAcentoSuave)
+      PressedColor: =ColorValue(hxTinta)
+      BorderThickness: =0
+      FocusedBorderThickness: =2
+      FocusedBorderColor: =ColorValue(hxAcentoSuave)
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+      Tooltip: =If(frPuedeCrearPO; "Registrar una nueva orden de compra"; "Registrar POs le corresponde a " & frPersonaCompras)
+      OnSelect: código 1.3
+
+
+--- conTabs y sus controles -----------------------------------------------
+
+
+  [conTabs]
+      FillPortions: =0
+      Height: =44
+      AlignInContainer: =AlignInContainer.SetByContainer
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.End
+      LayoutGap: =4
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =0 en las cuatro
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [btnTabPanel]
+      FillPortions: =0
+      Width: =90
+      Height: =38
+      AlignInContainer: =AlignInContainer.End
+      Text: ="Panel"
+      Size: =11
+      FontWeight: =If(varTab = "panel"; FontWeight.Semibold; FontWeight.Normal)
+      Color: =Color.White
+      Fill: =If(varTab = "panel"; RGBA(255; 255; 255; 0,16); RGBA(0; 0; 0; 0))
+      HoverFill: =RGBA(255; 255; 255; 0,1)
+      HoverColor: =Color.White
+      PressedFill: =RGBA(255; 255; 255; 0,2)
+      PressedColor: =Color.White
+      BorderThickness: =0
+      FocusedBorderThickness: =0
+      RadiusTopLeft / RadiusTopRight: =8 en las dos
+      RadiusBottomLeft / RadiusBottomRight: =0 en las dos
+      OnSelect: =Set(varTab; "panel")
+
+  [btnTabOrdenes]
+      FillPortions: =0
+      Width: =250
+      Height: =38
+      AlignInContainer: =AlignInContainer.End
+      Text: ="Órdenes de compra (PO)  ·  " & CountIf(frOrdenes; Etapa <> "Pagada")
+      Size: =11
+      FontWeight: =If(varTab = "ordenes"; FontWeight.Semibold; FontWeight.Normal)
+      Color: =Color.White
+      Fill: =If(varTab = "ordenes"; RGBA(255; 255; 255; 0,16); RGBA(0; 0; 0; 0))
+      HoverFill: =RGBA(255; 255; 255; 0,1)
+      HoverColor: =Color.White
+      PressedFill: =RGBA(255; 255; 255; 0,2)
+      PressedColor: =Color.White
+      BorderThickness: =0
+      FocusedBorderThickness: =0
+      RadiusTopLeft / RadiusTopRight: =8 en las dos
+      RadiusBottomLeft / RadiusBottomRight: =0 en las dos
+      OnSelect: =Set(varTab; "ordenes")
+
+  [btnTabReglas]
+      FillPortions: =0
+      Width: =150
+      Height: =38
+      AlignInContainer: =AlignInContainer.End
+      Text: ="Reglas de días"
+      Size: =11
+      FontWeight: =If(varTab = "reglas"; FontWeight.Semibold; FontWeight.Normal)
+      Color: =Color.White
+      Fill: =If(varTab = "reglas"; RGBA(255; 255; 255; 0,16); RGBA(0; 0; 0; 0))
+      HoverFill: =RGBA(255; 255; 255; 0,1)
+      HoverColor: =Color.White
+      PressedFill: =RGBA(255; 255; 255; 0,2)
+      PressedColor: =Color.White
+      BorderThickness: =0
+      FocusedBorderThickness: =0
+      RadiusTopLeft / RadiusTopRight: =8 en las dos
+      RadiusBottomLeft / RadiusBottomRight: =0 en las dos
+      OnSelect: =Set(varTab; "reglas")
+
+  [lblTabEspacio]
+      FillPortions: =1
+      Height: =38
+      Text: =""
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [lblSimulando]
+      FillPortions: =0
+      Width: =150
+      Height: =26
+      AlignInContainer: =AlignInContainer.Center
+      Text: ="Simulando " & Text(varHoy; "dd/mm/yyyy")
+      Visible: =varHoy <> Today()
+      Size: =9
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxWarn)
+      Fill: =ColorValue(hxWarnSuave)
+      Align: =Align.Center
+      VerticalAlign: =VerticalAlign.Middle
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =13 en las cuatro
+
+  [lblModo]
+      FillPortions: =0
+      Width: =120
+      Height: =26
+      AlignInContainer: =AlignInContainer.Center
+      Text: =If(frPuedeActuar; "Puede registrar"; "Solo lectura")
+      Size: =9
+      FontWeight: =FontWeight.Semibold
+      Color: =Color.White
+      Fill: =RGBA(255; 255; 255; 0,12)
+      Align: =Align.Center
+      VerticalAlign: =VerticalAlign.Middle
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =13 en las cuatro
+
+  [tmrRefresco]
+      FillPortions: =0
+      Width: =1
+      Height: =1
+      Duration: =180000
+      Repeat: =true
+      AutoStart: =true
+      AutoPause: =false
+      Visible: =false
+      OnTimerEnd: código 1.4
+
+
+Código 1.2 · icoRefrescar › OnSelect
+
+    ----- inicio código (powerfx) -----
+Concurrent(
+    ClearCollect(colOrdenes; Filter(TRZ_OrdenesCompra; Cerrada = 0 Or FechaPago >= DateAdd(Today(); -90; TimeUnit.Days)));
+    ClearCollect(colEquipo; Filter(TRZ_Equipo; Activo = true));
+    ClearCollect(colProveedores; Sort(Filter(TRZ_Proveedores; Activo = true); Title; SortOrder.Ascending));
+    ClearCollect(colConfig; FirstN(TRZ_Config; 1))
+);;
+If(varPOId <> 0;
+    ClearCollect(colHist; Sort(Filter(TRZ_HistorialPO; OrdenID = varPOId); ID; SortOrder.Descending))
+);;
+Notify("Datos actualizados."; NotificationType.Information)
+    ----- fin código -----
+
+
+Código 1.3 · btnNuevaPO › OnSelect
+
+    ----- inicio código (powerfx) -----
+If(
+    !frPuedeCrearPO;
+        Notify("Registrar POs le corresponde a " & frPersonaCompras & " (Compras)."; NotificationType.Warning);
+    Set(varModoPO; "nueva");;
+    Set(varErrPO; "");;
+    Set(varModoProv; If(CountRows(frListaProveedores) = 0; "texto"; "lista"));;
+    Reset(txtPO);; Reset(dpFechaSolicitud);; Reset(cmbProveedor);; Reset(txtProveedor);;
+    Reset(txtDescripcion);; Reset(txtCantidad);; Reset(txtDiasCredito);; Reset(txtPdf);;
+    Set(varModalPO; true)
+)
+    ----- fin código -----
+
+
+Código 1.4 · tmrRefresco › OnTimerEnd
+
+    ----- inicio código (powerfx) -----
+If(
+    Connection.Connected And varAccion = "" And !varModalPO And !varGuardando;
+        ClearCollect(colOrdenes; Filter(TRZ_OrdenesCompra; Cerrada = 0 Or FechaPago >= DateAdd(Today(); -90; TimeUnit.Days)));;
+        If(varPOId <> 0;
+            ClearCollect(colHist; Sort(Filter(TRZ_HistorialPO; OrdenID = varPOId); ID; SortOrder.Descending))
+        )
+)
+    ----- fin código -----
+
+
+--- drpVista como Cuadro combinado moderno ("Trabajando como") ------------
+
+drpVista es un Cuadro combinado MODERNO (Insertar › Entrada › Cuadro combinado, el de la sección moderna). Antes estaba descrito como Desplegable clásico; estas propiedades lo reemplazan. Las propiedades Value, Default, Chevron*, Selection* y HoverFill del control clásico NO existen en el moderno: no las busques.
+
+
+  [drpVista]
+      FillPortions: =0
+      Height: =32
+      Items: =frOpcionesVista
+      ItemDisplayText: =ThisItem.Etiqueta
+      DefaultSelectedItems: =Filter(frOpcionesVista; Email = varVistaEmail)
+      SelectMultiple: =false
+      InputTextPlaceholder: ="Selecciona una vista"
+      AccessibleLabel: ="Trabajando como"
+      FontSize: =11
+      FontWeight: =FontWeight.Semibold
+      BorderRadius: =6
+      DisplayMode: =DisplayMode.Edit
+      OnChange: código V.1
+
+
+Código V.1 · drpVista › OnChange
+
+    ----- inicio código (powerfx) -----
+If(
+    !IsBlank(Self.Selected);
+        Set(varVistaEmail; Self.Selected.Email);;
+        Set(varVistaNombre; Self.Selected.Nombre);;
+        Set(varVistaArea; Self.Selected.Area);;
+        Set(varAccion; "")
+)
+    ----- fin código -----
+
+
+--- Por qué al hacer clic solo aparece tu nombre --------------------------
+
+La lista de drpVista sale de frOpcionesVista, que arma: primero tu usuario y después cada persona de la colección colEquipo (lista TRZ_Equipo con Activo = Sí). Si solo aparece tu nombre, colEquipo no tiene a nadie más. Revisa en este orden:
+
+1. TRZ_Equipo debe tener una fila por persona: Lorena (Area = Compras), Magda (Area = Bodega), Zoila (Area = Proveedores), la persona de pagos (Area = Pagos) y tú (Area = Admin). El correo en Email debe ser el correo con el que cada quien entra a Microsoft 365.
+2. La columna Activo de cada fila debe estar en Sí. Las filas creadas antes de agregar la columna quedan vacías y el filtro Activo = true las descarta. En la configuración de la columna Activo pon "Valor predeterminado: Sí" y marca Sí en las filas existentes.
+3. La columna Area debe decir exactamente Compras, Bodega, Proveedores, Pagos o Admin (sin espacios al final).
+4. colEquipo se carga al abrir la app. Después de agregar o corregir personas, vuelve a cargar: en Power Apps Studio, menú "…" de App › Ejecutar OnStart; con la app publicada, toca el botón de actualizar (icoRefrescar) o cierra y abre la app.
+5. Diagnóstico rápido: agrega temporalmente una etiqueta lblDiagEquipo con Text =CountRows(colEquipo) & " personas en colEquipo · " & CountRows(frOpcionesVista) & " opciones en la lista". Si dice 0 o 1 personas, el problema está en la lista TRZ_Equipo (pasos 1 a 3). Bórrala al terminar.
+6. En el cuadro combinado moderno, el texto que escribes filtra la lista. Para ver todas las opciones, haz clic en la flecha de la derecha o borra el texto del cuadro antes de abrirlo.
+
+
+--- Cómo se usa "Trabajando como" -----------------------------------------
+
+1. Al abrir la app, drpVista muestra tu nombre con "(tú)", porque varVistaEmail empieza con tu correo.
+2. Haz clic en la flecha de drpVista: aparece tu nombre primero y debajo cada persona del equipo como "Nombre · Área" (por ejemplo "Magda · Bodega").
+3. Elige una persona: OnChange cambia varVistaEmail, varVistaNombre y varVistaArea. El Panel muestra los pendientes de esa persona y en la ficha de la PO se activan las acciones de su área.
+4. Si tu área es Admin, puedes registrar acciones en la vista de otra persona; el historial guarda tu nombre real y "vista de Magda". Si no eres Admin, la vista de otra persona es solo de consulta (lblModo dice "Solo lectura").
+5. Para volver, elige de nuevo tu nombre en drpVista.
+
+
+##############################################################################
+# 2. conPanel (pestaña Panel)
+##############################################################################
+
+Va dentro de conRaiz, después de conHeader. Se ve solo con la pestaña Panel y se desplaza hacia abajo.
+
+
+--- conPanel y conSaludo --------------------------------------------------
+
+
+  [conPanel]
+      FillPortions: =1
+      AlignInContainer: =AlignInContainer.SetByContainer
+      Visible: =varTab = "panel"
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =16
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =16 en las cuatro
+      LayoutOverflowY: =LayoutOverflow.Scroll
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conSaludo]
+      FillPortions: =0
+      Height: =64
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.End
+      LayoutGap: =12
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conSaludoTxt]
+      FillPortions: =1
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.End
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =2
+
+  [lblFechaHoy]
+      FillPortions: =0
+      Height: =18
+      Text: =Upper(Text(varHoy; "[$-es-ES]dddd, dd mmmm yyyy"))
+      Size: =9
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto2)
+      PaddingLeft: =0
+
+  [lblTituloPanel]
+      FillPortions: =0
+      Height: =34
+      Text: =frTituloPanel
+      Size: =20
+      FontWeight: =FontWeight.Bold
+      Color: =ColorValue(hxTexto)
+      PaddingLeft: =0
+
+  [btnVerOrdenes]
+      FillPortions: =0
+      Width: =190
+      Height: =36
+      AlignInContainer: =AlignInContainer.End
+      Text: ="Ver todas las órdenes"
+      Size: =10
+      FontWeight: =FontWeight.Semibold
+      Fill: =ColorValue(hxSuperficie)
+      Color: =ColorValue(hxTexto)
+      HoverFill: =ColorValue(hxSuperficie2)
+      HoverColor: =ColorValue(hxTexto)
+      PressedFill: =ColorValue(hxBorde)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+      OnSelect: =Set(varEtapaFiltro; "Todas");; Set(varChip; "todas");; Set(varTab; "ordenes")
+
+
+--- conEtapas y galEtapas -------------------------------------------------
+
+
+  [conEtapas]
+      FillPortions: =0
+      Height: =112
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =0
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [galEtapas]
+      FillPortions: =1
+      AlignInContainer: =AlignInContainer.Stretch
+      Items: =frConteoEtapas
+      TemplateSize: =(Self.Width - 6 * 8) / 7
+      TemplatePadding: =4
+      ShowScrollbar: =false
+      ShowNavigation: =false
+      Fill: =RGBA(0; 0; 0; 0)
+      BorderThickness: =0
+      OnSelect: =Set(varEtapaFiltro; ThisItem.Clave);; Set(varChip; "todas");; Set(varTab; "ordenes")
+
+  [lblEtNum]
+      X: =12
+      Y: =8
+      Width: =Parent.TemplateWidth - 24
+      Height: =34
+      Text: =ThisItem.Total
+      Size: =20
+      FontWeight: =FontWeight.Bold
+      Color: =ColorValue(hxTexto)
+
+  [lblEtNom]
+      X: =12
+      Y: =44
+      Width: =Parent.TemplateWidth - 24
+      Height: =22
+      Text: =ThisItem.Titulo
+      Size: =10
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto)
+
+  [lblEtSub]
+      X: =12
+      Y: =66
+      Width: =Parent.TemplateWidth - 24
+      Height: =22
+      Text: =If(ThisItem.Alertas > 0; ThisItem.Alertas & " con alerta"; ThisItem.Sub)
+      Size: =9
+      FontWeight: =If(ThisItem.Alertas > 0; FontWeight.Semibold; FontWeight.Normal)
+      Color: =If(ThisItem.Alertas > 0; ColorValue(hxCrit); ColorValue(hxTexto2))
+
+  [rctEtAlerta]
+      X: =10
+      Y: =0
+      Width: =Parent.TemplateWidth - 20
+      Height: =3
+      Fill: =ColorValue(hxCrit)
+      Visible: =ThisItem.Alertas > 0
+
+  [lblEtFondo]
+      X: =0
+      Y: =0
+      Width: =Parent.TemplateWidth
+      Height: =Parent.TemplateHeight
+      Text: =""
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =10 en las cuatro
+
+
+--- conPanelGrid, conCola y galCola ---------------------------------------
+
+
+  [conPanelGrid]
+      FillPortions: =0
+      Height: =Max(Min(CountRows(frCola); 8) * 58 + 110; 340)
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =16
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conCola]
+      FillPortions: =3
+      LayoutMinWidth: =420
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =8
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =14 en las cuatro
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =10 en las cuatro
+      DropShadow: =DropShadow.None
+
+  [conColaHead]
+      FillPortions: =0
+      Height: =28
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =8
+
+  [lblColaTit]
+      FillPortions: =1
+      Height: =28
+      Text: ="Por atender"
+      Size: =13
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto)
+      PaddingLeft: =0
+
+  [lblColaCnt]
+      FillPortions: =0
+      Width: =140
+      Height: =28
+      Text: =CountRows(frCola) & If(CountRows(frCola) = 1; " pendiente"; " pendientes")
+      Size: =9
+      Color: =ColorValue(hxTexto2)
+      Align: =Align.Right
+
+  [galCola]
+      FillPortions: =0
+      Height: =Min(CountRows(frCola); 8) * 58 + 4
+      Items: =frCola
+      TemplateSize: =58
+      TemplatePadding: =0
+      ShowScrollbar: =true
+      Visible: =!IsEmpty(frCola)
+      Fill: =RGBA(0; 0; 0; 0)
+      BorderThickness: =0
+      OnSelect: código 2.1
+
+  [lblColaPill]
+      X: =Parent.TemplateWidth - 176
+      Y: =17
+      Width: =164
+      Height: =24
+      Text: =ThisItem.Etapa
+      Size: =9
+      FontWeight: =FontWeight.Semibold
+      Align: =Align.Center
+      VerticalAlign: =VerticalAlign.Middle
+      Fill: =ColorValue(Switch(ThisItem.Nivel; "crit"; hxCritSuave; "warn"; hxWarnSuave; "info"; hxInfoSuave; "ok"; hxOkSuave; hxSuperficie2))
+      Color: =ColorValue(Switch(ThisItem.Nivel; "crit"; hxCrit; "warn"; hxWarn; "info"; hxAcento; "ok"; hxOk; hxTexto))
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =12 en las cuatro
+
+  [lblColaAccion]
+      X: =22
+      Y: =6
+      Width: =Parent.TemplateWidth - 210
+      Height: =24
+      Text: =ThisItem.Accion
+      Size: =11
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto)
+      Wrap: =false
+
+  [lblColaPO]
+      X: =22
+      Y: =30
+      Width: =Parent.TemplateWidth - 210
+      Height: =20
+      Text: =ThisItem.PO & "  ·  " & ThisItem.Proveedor
+      Size: =9
+      Color: =ColorValue(hxTexto2)
+      Wrap: =false
+
+  [rctColaSev]
+      X: =8
+      Y: =10
+      Width: =4
+      Height: =Parent.TemplateHeight - 20
+      Fill: =ColorValue(Switch(ThisItem.Nivel; "crit"; hxCrit; "warn"; hxWarn; "info"; hxAcento; "ok"; hxOk; hxBorde))
+
+  [rctColaDiv]
+      X: =0
+      Y: =Parent.TemplateHeight - 1
+      Width: =Parent.TemplateWidth
+      Height: =1
+      Fill: =ColorValue(hxBorde)
+
+  [lblColaVacia]
+      FillPortions: =0
+      Height: =44
+      Visible: =IsEmpty(frCola)
+      Text: =If(CountRows(frOrdenes) = 0; "Todavía no hay órdenes registradas. Usa + Nueva PO para registrar la primera."; "No hay pendientes para esta vista.")
+      Size: =10
+      Color: =ColorValue(hxTexto2)
+      Wrap: =true
+
+
+--- conIndic y galIndicadores ---------------------------------------------
+
+
+  [conIndic]
+      FillPortions: =2
+      LayoutMinWidth: =300
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =8
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =14 en las cuatro
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =10 en las cuatro
+
+  [lblIndTit]
+      FillPortions: =0
+      Height: =28
+      Text: ="Indicadores"
+      Size: =13
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto)
+
+  [galIndicadores]
+      FillPortions: =0
+      Height: =240
+      Items: =frIndicadores
+      TemplateSize: =40
+      TemplatePadding: =0
+      ShowScrollbar: =false
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [lblIndNom]
+      X: =0
+      Y: =0
+      Width: =Parent.TemplateWidth - 90
+      Height: =39
+      Text: =ThisItem.Nombre
+      Size: =10
+      Color: =ColorValue(hxTexto2)
+      VerticalAlign: =VerticalAlign.Middle
+      PaddingLeft: =0
+
+  [lblIndVal]
+      X: =Parent.TemplateWidth - 90
+      Y: =0
+      Width: =90
+      Height: =39
+      Text: =ThisItem.Valor
+      Font: =Font.'Courier New'
+      Size: =12
+      FontWeight: =FontWeight.Semibold
+      Color: =If(ThisItem.Critico; ColorValue(hxCrit); ColorValue(hxTexto))
+      Align: =Align.Right
+      PaddingRight: =0
+
+  [rctIndDiv]
+      X: =0
+      Y: =39
+      Width: =Parent.TemplateWidth
+      Height: =1
+      Fill: =ColorValue(hxBorde)
+
+
+Código 2.1 · galCola › OnSelect
+
+    ----- inicio código (powerfx) -----
+Set(varPOId; ThisItem.ID);;
+Set(varAccion; "");;
+Set(varFiltroHist; "todo");;
+ClearCollect(colHist; Sort(Filter(TRZ_HistorialPO; OrdenID = ThisItem.ID); ID; SortOrder.Descending));;
+Set(varTab; "ordenes")
+    ----- fin código -----
+
+
+##############################################################################
+# 3. conOrdenes (botón Órdenes de compra): filtros y listado
+##############################################################################
+
+Va dentro de conRaiz, después de conPanel. Arriba los filtros, abajo conOrdGrid con el listado a la izquierda y la ficha (secciones 4 a 6) a la derecha.
+
+
+--- conOrdenes y conFiltros -----------------------------------------------
+
+
+  [conOrdenes]
+      FillPortions: =1
+      AlignInContainer: =AlignInContainer.SetByContainer
+      Visible: =varTab = "ordenes"
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =12
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =16 en las cuatro
+      LayoutOverflowY: =LayoutOverflow.Hide
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conFiltros]
+      FillPortions: =0
+      Height: =44
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =10
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [txtBuscar]
+      FillPortions: =1
+      LayoutMinWidth: =260
+      Height: =40
+      AlignInContainer: =AlignInContainer.Center
+      Default: =varBuscar
+      HintText: ="Buscar por número de PO, proveedor, descripción, factura o estatus"
+      Mode: =TextMode.SingleLine
+      DelayOutput: =true
+      Clear: =true
+      EnableSpellCheck: =false
+      Font: =Font.'Segoe UI'
+      Size: =11
+      Color: =ColorValue(hxTexto)
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      HoverBorderColor: =ColorValue(hxTexto2)
+      FocusedBorderColor: =ColorValue(hxAcento)
+      FocusedBorderThickness: =2
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+      PaddingLeft: =12
+      OnChange: =Set(varBuscar; Self.Text)
+
+  [lblEtapaEtq]
+      FillPortions: =0
+      Width: =50
+      Height: =40
+      Text: ="Etapa"
+      Size: =10
+      Color: =ColorValue(hxTexto2)
+      Align: =Align.Right
+      VerticalAlign: =VerticalAlign.Middle
+
+  [drpEtapa]
+      FillPortions: =0
+      Width: =220
+      Height: =40
+      Items: =["Todas"; "Solicitada"; "Esperando factura"; "Factura sin recepción"; "Pendiente 101"; "En crédito"; "Pagada"]
+      Default: =varEtapaFiltro
+      Font: =Font.'Segoe UI'
+      Size: =11
+      Color: =ColorValue(hxTexto)
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      HoverFill: =ColorValue(hxSuperficie2)
+      SelectionFill: =ColorValue(hxAcento)
+      SelectionColor: =Color.White
+      ChevronBackground: =ColorValue(hxSuperficie)
+      ChevronFill: =ColorValue(hxTexto2)
+      ChevronHoverBackground: =ColorValue(hxSuperficie2)
+      ChevronHoverFill: =ColorValue(hxTexto)
+      PaddingLeft: =10
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+      OnChange: =Set(varEtapaFiltro; Self.Selected.Value)
+
+  [btnLimpiarFiltros]
+      FillPortions: =0
+      Width: =130
+      Height: =40
+      Text: ="Quitar filtros"
+      Visible: =varChip <> "pendientes" Or varEtapaFiltro <> "Todas" Or !IsBlank(varBuscar)
+      Size: =10
+      FontWeight: =FontWeight.Semibold
+      Fill: =RGBA(0; 0; 0; 0)
+      Color: =ColorValue(hxAcento)
+      HoverFill: =ColorValue(hxAcentoSuave)
+      HoverColor: =ColorValue(hxAcento)
+      PressedFill: =ColorValue(hxAcentoSuave)
+      BorderThickness: =0
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+      OnSelect: =Set(varChip; "pendientes");; Set(varEtapaFiltro; "Todas");; Set(varBuscar; "");; Reset(txtBuscar);; Reset(drpEtapa)
+
+
+--- conChips y galChips ---------------------------------------------------
+
+
+  [conChips]
+      FillPortions: =0
+      Height: =40
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =8
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [galChips]
+      FillPortions: =1
+      Height: =40
+      AlignInContainer: =AlignInContainer.Center
+      Items: =frChips
+      TemplateSize: =158
+      TemplatePadding: =0
+      ShowScrollbar: =false
+      ShowNavigation: =false
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [btnChip]
+      X: =0
+      Y: =3
+      Width: =Parent.TemplateWidth - 8
+      Height: =34
+      Text: =ThisItem.Texto & "  " & ThisItem.Conteo
+      Size: =10
+      FontWeight: =FontWeight.Semibold
+      Fill: =If(ThisItem.Clave = varChip; ColorValue(hxTexto); ColorValue(hxSuperficie))
+      Color: =If(ThisItem.Clave = varChip; Color.White; ColorValue(hxTexto))
+      HoverFill: =If(ThisItem.Clave = varChip; ColorValue(hxTexto); ColorValue(hxSuperficie2))
+      HoverColor: =If(ThisItem.Clave = varChip; Color.White; ColorValue(hxTexto))
+      PressedFill: =ColorValue(hxTexto)
+      PressedColor: =Color.White
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =17 en las cuatro
+      OnSelect: =Set(varChip; ThisItem.Clave)
+
+  [lblConteo]
+      FillPortions: =0
+      Width: =170
+      Height: =40
+      Text: =CountRows(frOrdenesFiltradas) & " de " & CountRows(frOrdenes) & " órdenes"
+      Size: =9
+      Color: =ColorValue(hxTexto2)
+      Align: =Align.Right
+
+
+--- conOrdGrid, conLista y encabezado del listado -------------------------
+
+
+  [conOrdGrid]
+      FillPortions: =1
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =16
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conLista]
+      FillPortions: =3
+      LayoutMinWidth: =560
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =0
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =0 en las cuatro
+      LayoutOverflowY: =LayoutOverflow.Hide
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =10 en las cuatro
+
+  [conCab]
+      FillPortions: =0
+      Height: =34
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =12
+      PaddingLeft: =23
+      PaddingRight: =16
+      Fill: =ColorValue(hxSuperficie2)
+      RadiusTopLeft / RadiusTopRight: =10 en las dos
+      RadiusBottomLeft / RadiusBottomRight: =0 en las dos
+
+  [lblCabPO]
+      FillPortions: =0
+      Width: =110
+      Height: =34
+      Text: ="PO"
+
+  [lblCabProv]
+      FillPortions: =3
+      LayoutMinWidth: =120
+      Height: =34
+      Text: ="PROVEEDOR Y MATERIAL"
+
+  [lblCabEst]
+      FillPortions: =0
+      Width: =160
+      Height: =34
+      Text: ="ESTATUS"
+
+  [lblCabSig]
+      FillPortions: =3
+      LayoutMinWidth: =140
+      Height: =34
+      Text: ="SIGUIENTE PASO"
+
+  [lblCabDias]
+      FillPortions: =0
+      Width: =60
+      Height: =34
+      Text: ="DÍAS"
+      Align: =Align.Right
+
+  [lblCabPO, lblCabProv, lblCabEst, lblCabSig, lblCabDias]
+      Size: =8
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto2)
+      PaddingLeft: =0
+
+
+--- galOrdenes y su plantilla ---------------------------------------------
+
+
+  [galOrdenes]
+      FillPortions: =1
+      AlignInContainer: =AlignInContainer.Stretch
+      Items: =frOrdenesFiltradas
+      TemplateSize: =76
+      TemplatePadding: =0
+      TemplateFill: =If(ThisItem.ID = varPOId; ColorValue(hxAcentoSuave); ColorValue(hxSuperficie))
+      ShowScrollbar: =true
+      Visible: =!IsEmpty(frOrdenesFiltradas)
+      Fill: =RGBA(0; 0; 0; 0)
+      BorderThickness: =0
+      OnSelect: código 3.1
+
+  [btnFilaSel]
+      X: =0
+      Y: =0
+      Width: =Parent.TemplateWidth
+      Height: =Parent.TemplateHeight
+      Text: =""
+      Fill: =RGBA(0; 0; 0; 0)
+      HoverFill: =RGBA(31; 91; 168; 0,05)
+      PressedFill: =RGBA(31; 91; 168; 0,1)
+      BorderThickness: =0
+      FocusedBorderThickness: =0
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =0 en las cuatro
+      OnSelect: =Select(Parent)
+
+  [rctFilaDiv]
+      X: =0
+      Y: =Parent.TemplateHeight - 1
+      Width: =Parent.TemplateWidth
+      Height: =1
+      Fill: =ColorValue(hxBorde)
+
+  [conFila]
+      X: =0
+      Y: =0
+      Width: =Parent.TemplateWidth
+      Height: =Parent.TemplateHeight - 1
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =12
+      PaddingLeft: =4
+      PaddingRight: =16
+      PaddingTop / PaddingBottom: =0 en las dos
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [rctFilaSev]
+      FillPortions: =0
+      Width: =3
+      Height: =52
+      AlignInContainer: =AlignInContainer.Center
+      Fill: =If(ThisItem.Nivel in ["crit"; "warn"]; ColorValue(Switch(ThisItem.Nivel; "crit"; hxCrit; hxWarn)); RGBA(0; 0; 0; 0))
+
+  [conFilaPO]
+      FillPortions: =0
+      Width: =110
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Center
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =2
+
+  [lblFilaPO]
+      FillPortions: =0
+      Height: =24
+      Text: =ThisItem.PO
+      Font: =Font.'Courier New'
+      Size: =11
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto)
+      PaddingLeft: =0
+
+  [lblFilaFecha]
+      FillPortions: =0
+      Height: =18
+      Text: =Text(ThisItem.FechaSolicitud; "dd/mm/yyyy")
+      Size: =9
+      Color: =ColorValue(hxTexto2)
+      PaddingLeft: =0
+
+  [conFilaProv]
+      FillPortions: =3
+      LayoutMinWidth: =120
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Center
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =2
+
+  [lblFilaProv]
+      FillPortions: =0
+      Height: =24
+      Text: =ThisItem.Proveedor
+      Size: =11
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto)
+      Wrap: =false
+      PaddingLeft: =0
+
+  [lblFilaDesc]
+      FillPortions: =0
+      Height: =18
+      Text: =ThisItem.Descripcion & If(IsBlank(ThisItem.Cantidad); ""; "  ·  " & ThisItem.Cantidad)
+      Size: =9
+      Color: =ColorValue(hxTexto2)
+      Wrap: =false
+      PaddingLeft: =0
+
+  [conFilaEst]
+      FillPortions: =0
+      Width: =160
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Center
+      LayoutAlignItems: =LayoutAlignItems.Start
+      LayoutGap: =6
+
+  [lblFilaPill]
+      FillPortions: =0
+      Width: =Min(Len(ThisItem.Etapa) * 7 + 22; 160)
+      Height: =24
+      AlignInContainer: =AlignInContainer.Start
+      Text: =ThisItem.Etapa
+      Size: =9
+      FontWeight: =FontWeight.Semibold
+      Align: =Align.Center
+      VerticalAlign: =VerticalAlign.Middle
+      Fill: =ColorValue(Switch(ThisItem.Nivel; "crit"; hxCritSuave; "warn"; hxWarnSuave; "info"; hxInfoSuave; "ok"; hxOkSuave; hxSuperficie2))
+      Color: =ColorValue(Switch(ThisItem.Nivel; "crit"; hxCrit; "warn"; hxWarn; "info"; hxAcento; "ok"; hxOk; hxTexto))
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =12 en las cuatro
+
+  [htmlMiniBarra]
+      FillPortions: =0
+      Width: =150
+      Height: =16
+      AlignInContainer: =AlignInContainer.Start
+      AutoHeight: =false
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =0 en las cuatro
+      HtmlText: código 3.2
+
+  [conFilaSig]
+      FillPortions: =3
+      LayoutMinWidth: =140
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Center
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =2
+
+  [lblFilaAccion]
+      FillPortions: =0
+      Height: =24
+      Text: =ThisItem.Accion
+      Size: =10
+      Color: =ColorValue(hxTexto)
+      Wrap: =false
+      PaddingLeft: =0
+
+  [lblFilaResp]
+      FillPortions: =0
+      Height: =18
+      Text: =If(IsBlank(ThisItem.Resp); "Sin acción pendiente"; "Responsable: " & ThisItem.RespNombre)
+      Size: =9
+      Color: =ColorValue(hxTexto2)
+      Wrap: =false
+      PaddingLeft: =0
+
+  [conFilaDias]
+      FillPortions: =0
+      Width: =60
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Center
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =0
+
+  [lblFilaDias]
+      FillPortions: =0
+      Height: =26
+      Text: =ThisItem.Dias
+      Font: =Font.'Courier New'
+      Size: =14
+      Color: =ColorValue(hxTexto)
+      Align: =Align.Right
+      PaddingRight: =0
+
+  [lblFilaDiasEtq]
+      FillPortions: =0
+      Height: =16
+      Text: ="hábiles"
+      Size: =8
+      Color: =ColorValue(hxTexto2)
+      Align: =Align.Right
+      PaddingRight: =0
+
+  [lblListaVacia]
+      FillPortions: =1
+      Visible: =IsEmpty(frOrdenesFiltradas)
+      Text: =If(CountRows(frOrdenes) = 0; "Aún no hay órdenes de compra. Registra la primera con + Nueva PO."; "Ninguna orden coincide con la búsqueda o el filtro.")
+      Size: =11
+      Color: =ColorValue(hxTexto2)
+      Align: =Align.Center
+      VerticalAlign: =VerticalAlign.Middle
+      Wrap: =true
+
+
+Código 3.1 · galOrdenes › OnSelect
+
+    ----- inicio código (powerfx) -----
+Set(varPOId; ThisItem.ID);;
+Set(varAccion; "");;
+Set(varFiltroHist; "todo");;
+ClearCollect(colHist; Sort(Filter(TRZ_HistorialPO; OrdenID = ThisItem.ID); ID; SortOrder.Descending))
+    ----- fin código -----
+
+
+Código 3.2 · htmlMiniBarra › HtmlText
+
+    ----- inicio código (powerfx) -----
+With(
+    {
+        idx: If(!ThisItem.HRec; 2; !ThisItem.HFac; 3; !ThisItem.H101; 4; !ThisItem.HPag; 5; 0);
+        cAct: If(ThisItem.Nivel = "crit"; hxCrit; hxAcento)
+    };
+    "<div style='display:flex;gap:3px;width:140px;margin-top:4px'>" &
+    Concat(
+        Table({I: 1; H: true}; {I: 2; H: ThisItem.HRec}; {I: 3; H: ThisItem.HFac}; {I: 4; H: ThisItem.H101}; {I: 5; H: ThisItem.HPag});
+        "<div style='flex:1;height:5px;border-radius:2px;background:" & If(H; hxOk; I = idx; cAct; hxBorde) & "'></div>"
+    ) &
+    "</div>"
+)
+    ----- fin código -----
+
+
+##############################################################################
+# 4. conDetalle (ficha de la PO): encabezado, datos, siguiente paso, recorrido y acciones
+##############################################################################
+
+Va dentro de conOrdGrid, después de conLista. Todas sus secciones son hijas directas de conDetalle con altura fija; así el contenedor se desplaza cuando el contenido no cabe.
+
+
+--- conDetalle y conDetVacio ----------------------------------------------
+
+
+  [conDetalle]
+      FillPortions: =2
+      LayoutMinWidth: =380
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =0
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =0 en las cuatro
+      LayoutOverflowY: =LayoutOverflow.Scroll
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =10 en las cuatro
+
+  [conDetVacio]
+      FillPortions: =0
+      Height: =200
+      Visible: =varPOId = 0
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =8
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =24 en las cuatro
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [lblDetVacioEtq]
+      FillPortions: =0
+      Height: =18
+      Text: ="DETALLE DE LA ORDEN"
+      Size: =8
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto2)
+
+  [lblDetVacioTit]
+      FillPortions: =0
+      Height: =28
+      Text: ="Selecciona una PO del listado"
+      Size: =14
+      FontWeight: =FontWeight.Bold
+      Color: =ColorValue(hxTexto)
+
+  [lblDetVacioTxt]
+      FillPortions: =0
+      Height: =64
+      Text: ="Aquí verás todos sus datos, en qué etapa está, quién tiene el siguiente paso, los tiempos y el historial completo."
+      Size: =10
+      Color: =ColorValue(hxTexto2)
+      Wrap: =true
+
+
+--- conDetHead ------------------------------------------------------------
+
+
+  [conDetHead]
+      FillPortions: =0
+      Height: =76
+      Visible: =varPOId <> 0
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =8
+      PaddingLeft: =16
+      PaddingRight: =16
+      PaddingTop: =12
+      PaddingBottom: =4
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conDetPO]
+      FillPortions: =1
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Center
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =0
+
+  [lblDetEtq]
+      FillPortions: =0
+      Height: =16
+      Text: ="ORDEN DE COMPRA"
+      Size: =8
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto2)
+      PaddingLeft: =0
+
+  [lblDetPO]
+      FillPortions: =0
+      Height: =34
+      Text: =frPO.PO
+      Font: =Font.'Courier New'
+      Size: =20
+      Color: =ColorValue(hxTexto)
+      PaddingLeft: =0
+
+  [lblDetPill]
+      FillPortions: =0
+      Width: =Min(Len(frPO.Etapa) * 7 + 22; 180)
+      Height: =26
+      AlignInContainer: =AlignInContainer.Center
+      Text: =frPO.Etapa
+      Size: =9
+      FontWeight: =FontWeight.Semibold
+      Align: =Align.Center
+      VerticalAlign: =VerticalAlign.Middle
+      Fill: =ColorValue(Switch(frPO.Nivel; "crit"; hxCritSuave; "warn"; hxWarnSuave; "info"; hxInfoSuave; "ok"; hxOkSuave; hxSuperficie2))
+      Color: =ColorValue(Switch(frPO.Nivel; "crit"; hxCrit; "warn"; hxWarn; "info"; hxAcento; "ok"; hxOk; hxTexto))
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =13 en las cuatro
+
+  [btnDetCerrar]
+      FillPortions: =0
+      Width: =80
+      Height: =34
+      AlignInContainer: =AlignInContainer.Center
+      Text: ="Cerrar"
+      Size: =10
+      Fill: =ColorValue(hxSuperficie)
+      Color: =ColorValue(hxTexto)
+      HoverFill: =ColorValue(hxSuperficie2)
+      HoverColor: =ColorValue(hxTexto)
+      PressedFill: =ColorValue(hxBorde)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+      OnSelect: =Set(varPOId; 0);; Set(varAccion; "")
+
+
+--- conDatos y galDatosPO -------------------------------------------------
+
+
+  [conDatos]
+      FillPortions: =0
+      Height: =216 + If(btnAbrirPdf.Visible; 40; 0)
+      Visible: =varPOId <> 0
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =6
+      PaddingLeft: =16
+      PaddingRight: =16
+      PaddingTop: =4
+      PaddingBottom: =0
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [galDatosPO]
+      FillPortions: =0
+      Height: =208
+      Items: =frDatosPO
+      WrapCount: =2
+      TemplateSize: =52
+      TemplatePadding: =0
+      ShowScrollbar: =false
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [lblDatoEtq]
+      X: =0
+      Y: =4
+      Width: =Parent.TemplateWidth - 8
+      Height: =16
+      Text: =Upper(ThisItem.Etq)
+      Size: =8
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto2)
+      PaddingLeft: =0
+
+  [lblDatoVal]
+      X: =0
+      Y: =20
+      Width: =Parent.TemplateWidth - 8
+      Height: =28
+      Text: =ThisItem.Val
+      Size: =11
+      Color: =ColorValue(hxTexto)
+      Wrap: =false
+      PaddingLeft: =0
+
+  [btnAbrirPdf]
+      FillPortions: =0
+      Width: =180
+      Height: =32
+      AlignInContainer: =AlignInContainer.Start
+      Text: ="Abrir PDF de la PO"
+      Visible: =StartsWith(Lower(frPORaw.PdfUrl); "http")
+      Size: =10
+      FontWeight: =FontWeight.Semibold
+      Fill: =RGBA(0; 0; 0; 0)
+      Color: =ColorValue(hxAcento)
+      HoverFill: =ColorValue(hxAcentoSuave)
+      HoverColor: =ColorValue(hxAcento)
+      BorderColor: =ColorValue(hxAcento)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+      OnSelect: =Launch(frPORaw.PdfUrl)
+
+
+--- conSiguiente y conHitos -----------------------------------------------
+
+
+  [conSiguiente]
+      FillPortions: =0
+      Height: =80
+      Visible: =varPOId <> 0
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =0
+      PaddingLeft: =16
+      PaddingRight: =16
+      PaddingTop: =8
+      PaddingBottom: =8
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conSigCaja]
+      FillPortions: =1
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =12
+      PaddingLeft: =12
+      PaddingRight: =12
+      PaddingTop: =10
+      PaddingBottom: =10
+      Fill: =ColorValue(hxSuperficie2)
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+
+  [rctSigSev]
+      FillPortions: =0
+      Width: =4
+      AlignInContainer: =AlignInContainer.Stretch
+      Fill: =ColorValue(Switch(frPO.Nivel; "crit"; hxCrit; "warn"; hxWarn; "info"; hxAcento; "ok"; hxOk; hxBorde))
+
+  [conSigTxt]
+      FillPortions: =1
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Center
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =2
+
+  [lblSigAccion]
+      FillPortions: =0
+      Height: =24
+      Text: =frPO.Accion
+      Size: =11
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto)
+      Wrap: =false
+      PaddingLeft: =0
+
+  [lblSigResp]
+      FillPortions: =0
+      Height: =18
+      Text: =If(IsBlank(frPO.Resp); "Sin acción pendiente"; "Responsable: " & frPO.RespNombre) & "  ·  " & frPO.Dias & " días hábiles en esta etapa"
+      Size: =9
+      Color: =ColorValue(hxTexto2)
+      PaddingLeft: =0
+
+  [conHitos]
+      FillPortions: =0
+      Height: =124
+      Visible: =varPOId <> 0
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =6
+      PaddingLeft: =16
+      PaddingRight: =16
+      PaddingTop: =8
+      PaddingBottom: =8
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [htmlHitos]
+      FillPortions: =0
+      Height: =78
+      HtmlText: =frHtmlHitos
+      AutoHeight: =false
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =0 en las cuatro
+
+  [lblTiempos]
+      FillPortions: =0
+      Height: =22
+      Text: =frTiempos
+      Size: =9
+      Color: =ColorValue(hxTexto2)
+      PaddingLeft: =0
+
+
+--- conAcciones y galAcciones ---------------------------------------------
+
+
+  [conAcciones]
+      FillPortions: =0
+      Height: =42 + galAcciones.Height + If(lblAccHint.Visible; 28; 0) + 12
+      Visible: =varPOId <> 0
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =6
+      PaddingLeft: =16
+      PaddingRight: =16
+      PaddingTop: =10
+      PaddingBottom: =6
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [lblAccEtq]
+      FillPortions: =0
+      Height: =18
+      Text: ="REGISTRAR  ·  " & Text(varHoy; "dd/mm/yyyy") & "  ·  " & varVistaNombre & " · " & frAreaVista
+      Size: =8
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto2)
+      PaddingLeft: =0
+
+  [galAcciones]
+      FillPortions: =0
+      Height: =RoundUp(CountRows(frAcciones) / 2; 0) * 46
+      Items: =frAcciones
+      WrapCount: =2
+      TemplateSize: =46
+      TemplatePadding: =0
+      ShowScrollbar: =false
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [btnAccion]
+      X: =0
+      Y: =4
+      Width: =Parent.TemplateWidth - 8
+      Height: =38
+      Text: =ThisItem.Texto
+      Size: =10
+      FontWeight: =If(ThisItem.Principal; FontWeight.Semibold; FontWeight.Normal)
+      DisplayMode: =If(ThisItem.Habilitada And !varGuardando; DisplayMode.Edit; DisplayMode.Disabled)
+      Fill: =If(ThisItem.Principal And ThisItem.Habilitada; ColorValue(hxAcento); ColorValue(hxSuperficie))
+      Color: =If(ThisItem.Principal And ThisItem.Habilitada; Color.White; ColorValue(hxTexto))
+      HoverFill: =If(ThisItem.Principal And ThisItem.Habilitada; ColorValue(hxTinta); ColorValue(hxSuperficie2))
+      HoverColor: =If(ThisItem.Principal And ThisItem.Habilitada; Color.White; ColorValue(hxTexto))
+      PressedFill: =ColorValue(hxAcentoSuave)
+      BorderColor: =If(ThisItem.Principal And ThisItem.Habilitada; ColorValue(hxAcento); ColorValue(hxBorde))
+      BorderThickness: =1
+      DisabledFill: =ColorValue(hxSuperficie2)
+      DisabledColor: =ColorValue(hxTexto2)
+      DisabledBorderColor: =ColorValue(hxBorde)
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+      Tooltip: =If(ThisItem.Habilitada; ThisItem.Texto; frHintAcciones)
+      OnSelect: código 4.1
+
+  [lblAccHint]
+      FillPortions: =0
+      Height: =24
+      Visible: =!IsBlank(frHintAcciones)
+      Text: =frHintAcciones
+      Size: =9
+      Color: =ColorValue(hxTexto2)
+      Wrap: =true
+      PaddingLeft: =0
+
+
+Código 4.1 · btnAccion › OnSelect
+
+    ----- inicio código (powerfx) -----
+If(
+    ThisItem.Clave = "editar";
+        Set(varModoPO; "editar");;
+        Set(varErrPO; "");;
+        Set(varModoProv; If(frPORaw.Proveedor in frListaProveedores.Value; "lista"; "texto"));;
+        Reset(cmbProveedor);; Reset(txtProveedor);; Reset(txtDescripcion);;
+        Reset(txtCantidad);; Reset(txtDiasCredito);; Reset(txtPdf);;
+        Set(varModalPO; true);
+    Set(varAccion; ThisItem.Clave);;
+    Reset(txtNotaAccion);; Reset(drpTipoRecepcion);; Reset(txtNumFactura);; Reset(drpResultadoLlamada);;
+    Reset(dpCompromiso);; Reset(txtDoc101);; Reset(drpMotivoRechazo);; Reset(txtRefPago)
+)
+    ----- fin código -----
+
+
+##############################################################################
+# 5. conFormAccion (formulario de cada acción)
+##############################################################################
+
+Va dentro de conDetalle, después de conAcciones. Aparece al tocar una acción y muestra solo el campo de esa acción más la nota. Cada acción tiene su propio botón Guardar; solo uno es visible a la vez.
+
+
+--- conFormAccion y conFormCaja -------------------------------------------
+
+
+  [conFormAccion]
+      FillPortions: =0
+      Height: =conFormCaja.Height + 16
+      Visible: =varPOId <> 0 And varAccion <> "" And varAccion <> "editar"
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =0
+      PaddingLeft: =16
+      PaddingRight: =16
+      PaddingTop: =8
+      PaddingBottom: =8
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conFormCaja]
+      FillPortions: =0
+      Height: =If(varAccion = "nota"; 270; 344)
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =8
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =14 en las cuatro
+      Fill: =ColorValue(hxFondo)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+
+  [lblFormTit]
+      FillPortions: =0
+      Height: =28
+      Text: =LookUp(frAcciones; Clave = varAccion).Texto
+      Size: =12
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto)
+      PaddingLeft: =0
+
+
+--- Contenedores de campo -------------------------------------------------
+
+Los siete contenedores de campo comparten estas propiedades; solo cambian Height en conF_Nota y Visible.
+
+
+  [conF_Recepcion, conF_Factura, conF_101, conF_Rechazo, conF_Pago]
+      FillPortions: =0
+      Height: =62
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =4
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conF_Recepcion]
+      Visible: =varAccion = "recepcion"
+
+  [conF_Factura]
+      Visible: =varAccion = "factura"
+
+  [conF_101]
+      Visible: =varAccion = "m101"
+
+  [conF_Rechazo]
+      Visible: =varAccion = "rechazo"
+
+  [conF_Pago]
+      Visible: =varAccion = "pago"
+
+  [conF_Llamada]
+      FillPortions: =0
+      Height: =62
+      Visible: =varAccion = "llamada"
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =10
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conF_LlamadaA]
+      FillPortions: =2
+
+  [conF_LlamadaB]
+      FillPortions: =1
+
+  [conF_LlamadaA, conF_LlamadaB]
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =4
+
+  [conF_Nota]
+      FillPortions: =0
+      Height: =104
+      Visible: =true
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =4
+      Fill: =RGBA(0; 0; 0; 0)
+
+
+--- Etiquetas de campo ----------------------------------------------------
+
+
+  [lblF_Recepcion]
+      Text: ="Recepción"
+
+  [lblF_Factura]
+      Text: ="Número de factura"
+
+  [lblF_Resultado]
+      Text: ="Resultado de la llamada"
+
+  [lblF_Compromiso]
+      Text: ="Fecha compromiso (opcional)"
+
+  [lblF_101]
+      Text: ="Documento de material (opcional)"
+
+  [lblF_Rechazo]
+      Text: ="Motivo del rechazo"
+
+  [lblF_Pago]
+      Text: ="Referencia de pago (opcional)"
+
+  [lblF_Nota]
+      Text: =If(varAccion = "nota"; "Nota"; "Nota (opcional)")
+
+  [lblF_Recepcion, lblF_Factura, lblF_Resultado, lblF_Compromiso, lblF_101, lblF_Rechazo, lblF_Pago, lblF_Nota]
+      FillPortions: =0
+
+  [(las mismas ocho)]
+      Height: =18
+      Size: =9
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto2)
+      PaddingLeft: =0
+
+
+--- Campos de captura -----------------------------------------------------
+
+
+  [drpTipoRecepcion]
+      Items: =["Completa"; "Parcial"]
+      Default: ="Completa"
+
+  [drpResultadoLlamada]
+      Items: =["Contestó, enviará factura"; "No contestó"; "Dice que ya la envió: revisar buzón"; "Pidió datos de la PO"; "Otro"]
+      Default: ="Contestó, enviará factura"
+
+  [drpMotivoRechazo]
+      Items: =["Datos fiscales incorrectos (NIT)"; "Monto no coincide con la PO"; "Cantidad no coincide con lo recibido"; "Factura fuera de tiempo"; "Otro"]
+      Default: ="Datos fiscales incorrectos (NIT)"
+
+  [drpTipoRecepcion, drpResultadoLlamada, drpMotivoRechazo]
+      FillPortions: =0
+
+  [(los mismos tres)]
+      Height: =40
+      Font: =Font.'Segoe UI'
+      Size: =11
+      Color: =ColorValue(hxTexto)
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      HoverFill: =ColorValue(hxSuperficie2)
+      SelectionFill: =ColorValue(hxAcento)
+      SelectionColor: =Color.White
+      ChevronBackground: =ColorValue(hxSuperficie)
+      ChevronFill: =ColorValue(hxTexto2)
+      PaddingLeft: =10
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+
+  [txtNumFactura]
+      HintText: ="Serie y número FEL"
+      Font: =Font.'Courier New'
+
+  [txtDoc101]
+      HintText: ="5000112233"
+      Font: =Font.'Courier New'
+
+  [txtRefPago]
+      HintText: ="TRF-00000"
+      Font: =Font.'Courier New'
+
+  [txtNotaAccion]
+      HintText: ="Comentario para el historial"
+      Font: =Font.'Segoe UI'
+      Mode: =TextMode.MultiLine
+      Height: =80
+
+  [txtNumFactura, txtDoc101, txtRefPago]
+      Mode: =TextMode.SingleLine
+      Height: =40
+
+  [txtNumFactura, txtDoc101, txtRefPago, txtNotaAccion]
+      FillPortions: =0
+
+  [(los mismos cuatro)]
+      Default: =""
+      Size: =11
+      Color: =ColorValue(hxTexto)
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      FocusedBorderColor: =ColorValue(hxAcento)
+      FocusedBorderThickness: =2
+      PaddingLeft: =10
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+
+  [dpCompromiso]
+      FillPortions: =0
+      Height: =40
+      DefaultDate: =Blank()
+      Format: =DateTimeFormat.ShortDate
+      Language: ="es-ES"
+      IsEditable: =false
+      StartYear: =Year(Today())
+      EndYear: =Year(Today()) + 1
+      Size: =10
+      Color: =ColorValue(hxTexto)
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      IconFill: =Color.White
+      IconBackground: =ColorValue(hxAcento)
+
+  [lblFormAviso]
+      FillPortions: =0
+      Height: =40
+      Text: =frAvisoForm
+      Size: =9
+      Color: =ColorValue(hxTexto2)
+      Wrap: =true
+      PaddingLeft: =0
+
+
+--- conFormBtns y botones -------------------------------------------------
+
+
+  [conFormBtns]
+      FillPortions: =0
+      Height: =44
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutJustifyContent: =LayoutJustifyContent.End
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =8
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [btnCancelarAccion]
+      FillPortions: =0
+      Width: =100
+      Height: =36
+      Text: ="Cancelar"
+      Size: =10
+      Fill: =ColorValue(hxSuperficie)
+      Color: =ColorValue(hxTexto)
+      HoverFill: =ColorValue(hxSuperficie2)
+      HoverColor: =ColorValue(hxTexto)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+      OnSelect: =Set(varAccion; "")
+
+  [btnGuardarRecepcion]
+      Visible: =varAccion = "recepcion"
+
+  [btnGuardarFactura]
+      Visible: =varAccion = "factura"
+
+  [btnGuardarLlamada]
+      Visible: =varAccion = "llamada"
+
+  [btnGuardar101]
+      Visible: =varAccion = "m101"
+
+  [btnGuardarRechazo]
+      Visible: =varAccion = "rechazo"
+
+  [btnGuardarPago]
+      Visible: =varAccion = "pago"
+
+  [btnGuardarNota]
+      Visible: =varAccion = "nota"
+
+  [btnGuardarRecepcion, btnGuardarFactura, btnGuardarLlamada, btnGuardar101, btnGuardarRechazo, btnGuardarPago, btnGuardarNota]
+      FillPortions: =0
+
+  [(los mismos siete)]
+      Width: =120
+      Height: =36
+      Text: ="Guardar"
+      Size: =10
+      FontWeight: =FontWeight.Semibold
+      Fill: =ColorValue(hxAcento)
+      Color: =Color.White
+      HoverFill: =ColorValue(hxTinta)
+      HoverColor: =Color.White
+      PressedFill: =ColorValue(hxTinta)
+      BorderThickness: =0
+      DisplayMode: =If(varGuardando; DisplayMode.Disabled; DisplayMode.Edit)
+      DisabledFill: =ColorValue(hxBorde)
+      DisabledColor: =ColorValue(hxTexto2)
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+
+  [btnGuardarRecepcion]
+      OnSelect: código 5.1
+
+  [btnGuardarFactura]
+      OnSelect: código 5.2
+
+  [btnGuardarLlamada]
+      OnSelect: código 5.3
+
+  [btnGuardar101]
+      OnSelect: código 5.4
+
+  [btnGuardarRechazo]
+      OnSelect: código 5.5
+
+  [btnGuardarPago]
+      OnSelect: código 5.6
+
+  [btnGuardarNota]
+      OnSelect: código 5.7
+
+
+Código 5.1 · btnGuardarRecepcion › OnSelect
+
+    ----- inicio código (powerfx) -----
+Set(varGuardando; true);;
+Set(varPOAct; LookUp(TRZ_OrdenesCompra; ID = varPOId));;
+If(
+    !IsBlank(varPOAct.FechaRecepcion);
+        Notify("Otra persona ya registró la recepción de esta PO. Revisa el historial."; NotificationType.Warning);
+    Set(varRes; Patch(TRZ_OrdenesCompra; varPOAct;
+        {
+            FechaRecepcion: varHoy;
+            TipoRecepcion: drpTipoRecepcion.Selected.Value;
+            RecibidoPor: User().FullName;
+            Etapa: If(IsBlank(varPOAct.FechaFactura); "Esperando factura"; "Pendiente 101");
+            FechaAlertaFactura: If(IsBlank(varPOAct.FechaFactura); frFechaAlerta; Blank());
+            FechaLimite101: If(IsBlank(varPOAct.FechaFactura); Blank(); frFechaLimite101);
+            UltimoMovimiento: Now()
+        }
+    ));;
+    If(
+        IsEmpty(Errors(TRZ_OrdenesCompra));
+            Patch(TRZ_HistorialPO; Defaults(TRZ_HistorialPO); frFirma;
+                {
+                    Title: varPOAct.Title; OrdenID: varPOId; Tipo: "Recepción"; FechaEvento: varHoy;
+                    Detalle: "Producto recibido en bodega (" & Lower(drpTipoRecepcion.Selected.Value) & ")" &
+                        If(IsBlank(Trim(txtNotaAccion.Text)); ""; " — " & Trim(txtNotaAccion.Text))
+                }
+            );;
+            Patch(TRZ_HistorialPO; Defaults(TRZ_HistorialPO);
+                {
+                    Title: varPOAct.Title; OrdenID: varPOId; Tipo: "Aviso"; FechaEvento: varHoy; Area: "Sistema"; RegistradoPor: "Sistema";
+                    DestinatarioEmail: If(IsBlank(varPOAct.FechaFactura); frEmailCompras & ";" & frEmailProveedores; frEmailCompras);
+                    Detalle: If(IsBlank(varPOAct.FechaFactura);
+                        "PO " & varPOAct.Title & " recibida en bodega. Corre el plazo de " & frDiasAlerta & " días hábiles para que entre la factura (hasta el " & Text(frFechaAlerta; "dd/mm/yyyy") & ").";
+                        "La factura " & varPOAct.NumFactura & " ya estaba en el buzón. " & frPersonaCompras & " puede dar el 101.")
+                }
+            );;
+            Patch(colOrdenes; LookUp(colOrdenes; ID = varPOId); varRes);;
+            ClearCollect(colHist; Sort(Filter(TRZ_HistorialPO; OrdenID = varPOId); ID; SortOrder.Descending));;
+            Set(varAccion; "");;
+            Notify("Recepción registrada en la PO " & varPOAct.Title & "."; NotificationType.Success);
+        Notify("No se guardó: " & First(Errors(TRZ_OrdenesCompra)).Message; NotificationType.Error)
+    )
+);;
+Set(varGuardando; false)
+    ----- fin código -----
+
+
+Código 5.2 · btnGuardarFactura › OnSelect
+
+    ----- inicio código (powerfx) -----
+Set(varGuardando; true);;
+Set(varPOAct; LookUp(TRZ_OrdenesCompra; ID = varPOId));;
+If(
+    IsBlank(Trim(txtNumFactura.Text));
+        Notify("Escribe el número de factura (serie y número FEL)."; NotificationType.Error);
+    !IsBlank(varPOAct.FechaFactura);
+        Notify("Esta PO ya tiene la factura " & varPOAct.NumFactura & " registrada."; NotificationType.Warning);
+    Set(varRes; Patch(TRZ_OrdenesCompra; varPOAct;
+        {
+            FechaFactura: varHoy;
+            NumFactura: Upper(Trim(txtNumFactura.Text));
+            FacturaPor: User().FullName;
+            Etapa: If(IsBlank(varPOAct.FechaRecepcion); "Factura sin recepción"; IsBlank(varPOAct.Fecha101); "Pendiente 101"; "En crédito");
+            FechaAlertaFactura: Blank();
+            FechaLimite101: If(!IsBlank(varPOAct.FechaRecepcion) And IsBlank(varPOAct.Fecha101); frFechaLimite101; Blank());
+            FechaPagoEstimada: If(IsBlank(varPOAct.Fecha101); Blank(); DateAdd(varHoy; Coalesce(varPOAct.DiasCredito; frDiasCredito); TimeUnit.Days));
+            UltimoMovimiento: Now()
+        }
+    ));;
+    If(
+        IsEmpty(Errors(TRZ_OrdenesCompra));
+            Patch(TRZ_HistorialPO; Defaults(TRZ_HistorialPO); frFirma;
+                {
+                    Title: varPOAct.Title; OrdenID: varPOId; Tipo: "Factura"; FechaEvento: varHoy;
+                    Detalle: "Factura " & varRes.NumFactura & " registrada en el sistema" &
+                        If(IsBlank(Trim(txtNotaAccion.Text)); ""; " — " & Trim(txtNotaAccion.Text))
+                }
+            );;
+            Patch(TRZ_HistorialPO; Defaults(TRZ_HistorialPO);
+                {
+                    Title: varPOAct.Title; OrdenID: varPOId; Tipo: "Aviso"; FechaEvento: varHoy; Area: "Sistema"; RegistradoPor: "Sistema";
+                    DestinatarioEmail: If(IsBlank(varPOAct.FechaRecepcion); frEmailBodega; IsBlank(varPOAct.Fecha101); frEmailCompras; frEmailPagos);
+                    Detalle: If(
+                        IsBlank(varPOAct.FechaRecepcion);
+                            "Ticket a " & frPersonaBodega & ": la factura " & varRes.NumFactura & " está en el buzón sin recepción en bodega. Confirmar si el producto llegó.";
+                        IsBlank(varPOAct.Fecha101);
+                            "La factura " & varRes.NumFactura & " ya está en el sistema. " & frPersonaCompras & " debe dar el 101 antes del " & Text(frFechaLimite101; "dd/mm/yyyy") & ".";
+                        "La factura pasa a pago. Pago estimado el " & Text(varRes.FechaPagoEstimada; "dd/mm/yyyy") & ".")
+                }
+            );;
+            Patch(colOrdenes; LookUp(colOrdenes; ID = varPOId); varRes);;
+            ClearCollect(colHist; Sort(Filter(TRZ_HistorialPO; OrdenID = varPOId); ID; SortOrder.Descending));;
+            Set(varAccion; "");;
+            Notify("Factura registrada en la PO " & varPOAct.Title & "."; NotificationType.Success);
+        Notify("No se guardó: " & First(Errors(TRZ_OrdenesCompra)).Message; NotificationType.Error)
+    )
+);;
+Set(varGuardando; false)
+    ----- fin código -----
+
+
+Código 5.3 · btnGuardarLlamada › OnSelect
+
+    ----- inicio código (powerfx) -----
+Set(varGuardando; true);;
+Set(varPOAct; LookUp(TRZ_OrdenesCompra; ID = varPOId));;
+If(
+    !IsBlank(varPOAct.FechaFactura);
+        Notify("La factura ya entró al sistema; no hace falta llamar."; NotificationType.Warning);
+    Set(varRes; Patch(TRZ_OrdenesCompra; varPOAct;
+        {
+            Llamadas: Coalesce(varPOAct.Llamadas; 0) + 1;
+            FechaUltLlamada: varHoy;
+            ResultadoLlamada: drpResultadoLlamada.Selected.Value;
+            FechaAlertaFactura: frFechaRellamada;
+            UltimoMovimiento: Now()
+        }
+    ));;
+    If(
+        IsEmpty(Errors(TRZ_OrdenesCompra));
+            Patch(TRZ_HistorialPO; Defaults(TRZ_HistorialPO); frFirma;
+                {
+                    Title: varPOAct.Title; OrdenID: varPOId; Tipo: "Llamada"; FechaEvento: varHoy;
+                    Detalle: "Llamada #" & varRes.Llamadas & ": " & drpResultadoLlamada.Selected.Value &
+                        If(IsBlank(dpCompromiso.SelectedDate); ""; " · compromiso de envío " & Text(dpCompromiso.SelectedDate; "dd/mm/yyyy")) &
+                        If(IsBlank(Trim(txtNotaAccion.Text)); ""; " — " & Trim(txtNotaAccion.Text)) &
+                        ". Si no llega, nueva llamada el " & Text(frFechaRellamada; "dd/mm/yyyy") & "."
+                }
+            );;
+            Patch(colOrdenes; LookUp(colOrdenes; ID = varPOId); varRes);;
+            ClearCollect(colHist; Sort(Filter(TRZ_HistorialPO; OrdenID = varPOId); ID; SortOrder.Descending));;
+            Set(varAccion; "");;
+            Notify("Llamada #" & varRes.Llamadas & " registrada. El estatus no cambia."; NotificationType.Success);
+        Notify("No se guardó: " & First(Errors(TRZ_OrdenesCompra)).Message; NotificationType.Error)
+    )
+);;
+Set(varGuardando; false)
+    ----- fin código -----
+
+
+Código 5.4 · btnGuardar101 › OnSelect
+
+    ----- inicio código (powerfx) -----
+Set(varGuardando; true);;
+Set(varPOAct; LookUp(TRZ_OrdenesCompra; ID = varPOId));;
+If(
+    !IsBlank(varPOAct.Fecha101);
+        Notify("El 101 de esta PO ya está registrado."; NotificationType.Warning);
+    IsBlank(varPOAct.FechaRecepcion);
+        Notify("Primero " & frPersonaBodega & " debe confirmar la recepción en bodega."; NotificationType.Warning);
+    Set(varRes; Patch(TRZ_OrdenesCompra; varPOAct;
+        {
+            Fecha101: varHoy;
+            Doc101: Trim(txtDoc101.Text);
+            Por101: User().FullName;
+            Etapa: If(IsBlank(varPOAct.FechaFactura); "Esperando factura"; "En crédito");
+            FechaLimite101: Blank();
+            FechaPagoEstimada: If(IsBlank(varPOAct.FechaFactura); Blank(); DateAdd(varHoy; Coalesce(varPOAct.DiasCredito; frDiasCredito); TimeUnit.Days));
+            UltimoMovimiento: Now()
+        }
+    ));;
+    If(
+        IsEmpty(Errors(TRZ_OrdenesCompra));
+            Patch(TRZ_HistorialPO; Defaults(TRZ_HistorialPO); frFirma;
+                {
+                    Title: varPOAct.Title; OrdenID: varPOId; Tipo: "101"; FechaEvento: varHoy;
+                    Detalle: "101 registrado" &
+                        If(IsBlank(Trim(txtDoc101.Text)); ""; " · documento " & Trim(txtDoc101.Text)) &
+                        If(IsBlank(Trim(txtNotaAccion.Text)); ""; " — " & Trim(txtNotaAccion.Text))
+                }
+            );;
+            Patch(TRZ_HistorialPO; Defaults(TRZ_HistorialPO);
+                {
+                    Title: varPOAct.Title; OrdenID: varPOId; Tipo: "Aviso"; FechaEvento: varHoy; Area: "Sistema"; RegistradoPor: "Sistema";
+                    DestinatarioEmail: If(IsBlank(varPOAct.FechaFactura); frEmailProveedores; frEmailPagos);
+                    Detalle: If(IsBlank(varPOAct.FechaFactura);
+                        "101 dado sin factura en el sistema. " & frPersonaProveedores & " da seguimiento al proveedor.";
+                        "La factura pasa a pago automáticamente. Crédito de " & Coalesce(varPOAct.DiasCredito; frDiasCredito) & " días: pago estimado el " & Text(varRes.FechaPagoEstimada; "dd/mm/yyyy") & ".")
+                }
+            );;
+            Patch(colOrdenes; LookUp(colOrdenes; ID = varPOId); varRes);;
+            ClearCollect(colHist; Sort(Filter(TRZ_HistorialPO; OrdenID = varPOId); ID; SortOrder.Descending));;
+            Set(varAccion; "");;
+            Notify("101 registrado en la PO " & varPOAct.Title & "."; NotificationType.Success);
+        Notify("No se guardó: " & First(Errors(TRZ_OrdenesCompra)).Message; NotificationType.Error)
+    )
+);;
+Set(varGuardando; false)
+    ----- fin código -----
+
+
+Código 5.5 · btnGuardarRechazo › OnSelect
+
+    ----- inicio código (powerfx) -----
+Set(varGuardando; true);;
+Set(varPOAct; LookUp(TRZ_OrdenesCompra; ID = varPOId));;
+If(
+    IsBlank(varPOAct.FechaFactura);
+        Notify("Esta PO no tiene una factura que rechazar."; NotificationType.Warning);
+    !IsBlank(varPOAct.FechaPago);
+        Notify("La PO ya está pagada."; NotificationType.Warning);
+    Set(varRes; Patch(TRZ_OrdenesCompra; varPOAct;
+        {
+            FechaFactura: Blank();
+            NumFactura: "";
+            FacturaPor: "";
+            Rechazos: Coalesce(varPOAct.Rechazos; 0) + 1;
+            Etapa: If(IsBlank(varPOAct.FechaRecepcion); "Solicitada"; "Esperando factura");
+            FechaAlertaFactura: If(IsBlank(varPOAct.FechaRecepcion); Blank(); frFechaRellamada);
+            FechaLimite101: Blank();
+            FechaPagoEstimada: Blank();
+            UltimoMovimiento: Now()
+        }
+    ));;
+    If(
+        IsEmpty(Errors(TRZ_OrdenesCompra));
+            Patch(TRZ_HistorialPO; Defaults(TRZ_HistorialPO); frFirma;
+                {
+                    Title: varPOAct.Title; OrdenID: varPOId; Tipo: "Rechazo"; FechaEvento: varHoy;
+                    Detalle: "Factura " & varPOAct.NumFactura & " rechazada: " & drpMotivoRechazo.Selected.Value &
+                        If(IsBlank(Trim(txtNotaAccion.Text)); ""; " — " & Trim(txtNotaAccion.Text))
+                }
+            );;
+            Patch(TRZ_HistorialPO; Defaults(TRZ_HistorialPO);
+                {
+                    Title: varPOAct.Title; OrdenID: varPOId; Tipo: "Aviso"; FechaEvento: varHoy; Area: "Sistema"; RegistradoPor: "Sistema";
+                    DestinatarioEmail: frEmailProveedores;
+                    Detalle: "Pedir al proveedor " & varPOAct.Proveedor & " una factura corregida de la PO " & varPOAct.Title & ". Motivo: " & drpMotivoRechazo.Selected.Value & "."
+                }
+            );;
+            Patch(colOrdenes; LookUp(colOrdenes; ID = varPOId); varRes);;
+            ClearCollect(colHist; Sort(Filter(TRZ_HistorialPO; OrdenID = varPOId); ID; SortOrder.Descending));;
+            Set(varAccion; "");;
+            Notify("Factura rechazada. Se avisó a " & frPersonaProveedores & "."; NotificationType.Success);
+        Notify("No se guardó: " & First(Errors(TRZ_OrdenesCompra)).Message; NotificationType.Error)
+    )
+);;
+Set(varGuardando; false)
+    ----- fin código -----
+
+
+Código 5.6 · btnGuardarPago › OnSelect
+
+    ----- inicio código (powerfx) -----
+Set(varGuardando; true);;
+Set(varPOAct; LookUp(TRZ_OrdenesCompra; ID = varPOId));;
+If(
+    !IsBlank(varPOAct.FechaPago);
+        Notify("El pago de esta PO ya está registrado."; NotificationType.Warning);
+    IsBlank(varPOAct.Fecha101) Or IsBlank(varPOAct.FechaFactura);
+        Notify("Para registrar el pago se necesita la factura en el sistema y el 101."; NotificationType.Warning);
+    Set(varRes; Patch(TRZ_OrdenesCompra; varPOAct;
+        {
+            FechaPago: varHoy;
+            RefPago: Trim(txtRefPago.Text);
+            PagadoPor: User().FullName;
+            Etapa: "Pagada";
+            Cerrada: 1;
+            UltimoMovimiento: Now()
+        }
+    ));;
+    If(
+        IsEmpty(Errors(TRZ_OrdenesCompra));
+            Patch(TRZ_HistorialPO; Defaults(TRZ_HistorialPO); frFirma;
+                {
+                    Title: varPOAct.Title; OrdenID: varPOId; Tipo: "Pago"; FechaEvento: varHoy;
+                    Detalle: "Pago registrado" &
+                        If(IsBlank(Trim(txtRefPago.Text)); ""; " · referencia " & Trim(txtRefPago.Text)) &
+                        ". Proceso cerrado." &
+                        If(IsBlank(Trim(txtNotaAccion.Text)); ""; " — " & Trim(txtNotaAccion.Text))
+                }
+            );;
+            Patch(colOrdenes; LookUp(colOrdenes; ID = varPOId); varRes);;
+            ClearCollect(colHist; Sort(Filter(TRZ_HistorialPO; OrdenID = varPOId); ID; SortOrder.Descending));;
+            Set(varAccion; "");;
+            Notify("Pago registrado. La PO " & varPOAct.Title & " queda cerrada."; NotificationType.Success);
+        Notify("No se guardó: " & First(Errors(TRZ_OrdenesCompra)).Message; NotificationType.Error)
+    )
+);;
+Set(varGuardando; false)
+    ----- fin código -----
+
+
+Código 5.7 · btnGuardarNota › OnSelect
+
+    ----- inicio código (powerfx) -----
+Set(varGuardando; true);;
+If(
+    IsBlank(Trim(txtNotaAccion.Text));
+        Notify("Escribe la nota."; NotificationType.Error);
+    Patch(TRZ_HistorialPO; Defaults(TRZ_HistorialPO); frFirma;
+        {Title: frPORaw.Title; OrdenID: varPOId; Tipo: "Nota"; FechaEvento: varHoy; Detalle: Trim(txtNotaAccion.Text)}
+    );;
+    If(
+        IsEmpty(Errors(TRZ_HistorialPO));
+            Set(varRes; Patch(TRZ_OrdenesCompra; LookUp(TRZ_OrdenesCompra; ID = varPOId); {UltimoMovimiento: Now()}));;
+            Patch(colOrdenes; LookUp(colOrdenes; ID = varPOId); varRes);;
+            ClearCollect(colHist; Sort(Filter(TRZ_HistorialPO; OrdenID = varPOId); ID; SortOrder.Descending));;
+            Set(varAccion; "");;
+            Notify("Nota agregada al historial."; NotificationType.Success);
+        Notify("No se guardó la nota: " & First(Errors(TRZ_HistorialPO)).Message; NotificationType.Error)
+    )
+);;
+Set(varGuardando; false)
+    ----- fin código -----
+
+
+##############################################################################
+# 6. conHist (historial de la PO)
+##############################################################################
+
+Va dentro de conDetalle, último. Muestra los movimientos del más nuevo al más viejo con tres filtros: Todo, Registros del equipo y Avisos automáticos.
+
+
+  [conHist]
+      FillPortions: =0
+      Height: =600
+      Visible: =varPOId <> 0
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =8
+      PaddingLeft: =16
+      PaddingRight: =16
+      PaddingTop: =12
+      PaddingBottom: =16
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conHistHead]
+      FillPortions: =0
+      Height: =40
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =10
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [lblHistTit]
+      FillPortions: =0
+      Width: =90
+      Height: =40
+      Text: ="Historial"
+      Size: =13
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto)
+      PaddingLeft: =0
+
+  [galHistChips]
+      FillPortions: =1
+      Height: =36
+      AlignInContainer: =AlignInContainer.Center
+      Items: =frHistChips
+      TemplateSize: =190
+      TemplatePadding: =0
+      ShowScrollbar: =false
+      ShowNavigation: =false
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [btnHistChip]
+      X: =0
+      Y: =3
+      Width: =Parent.TemplateWidth - 8
+      Height: =30
+      Text: =ThisItem.Texto & "  " & ThisItem.Conteo
+      Size: =9
+      FontWeight: =FontWeight.Semibold
+      Fill: =If(ThisItem.Clave = varFiltroHist; ColorValue(hxTexto); ColorValue(hxSuperficie))
+      Color: =If(ThisItem.Clave = varFiltroHist; Color.White; ColorValue(hxTexto))
+      HoverFill: =If(ThisItem.Clave = varFiltroHist; ColorValue(hxTexto); ColorValue(hxSuperficie2))
+      HoverColor: =If(ThisItem.Clave = varFiltroHist; Color.White; ColorValue(hxTexto))
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =15 en las cuatro
+      OnSelect: =Set(varFiltroHist; ThisItem.Clave)
+
+  [galHist]
+      FillPortions: =1
+      AlignInContainer: =AlignInContainer.Stretch
+      Items: =frHist
+      WrapCount: =1
+      TemplateSize: =56
+      TemplatePadding: =0
+      ShowScrollbar: =true
+      Visible: =!IsEmpty(frHist)
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [lblHistMeta]
+      X: =26
+      Y: =0
+      Width: =Parent.TemplateWidth - 30
+      Height: =20
+      Text: código 6.1
+      Size: =9
+      Color: =ColorValue(hxTexto2)
+      Wrap: =false
+      PaddingLeft: =0
+
+  [lblHistDetalle]
+      X: =26
+      Y: =20
+      Width: =Parent.TemplateWidth - 30
+      AutoHeight: =true
+      Wrap: =true
+      Text: =ThisItem.Detalle
+      Size: =10
+      Color: =If(ThisItem.Tipo = "Aviso"; ColorValue(hxTexto2); ColorValue(hxTexto))
+      PaddingLeft: =0
+      PaddingTop: =2
+      PaddingBottom: =14
+
+  [cirHist]
+      X: =1
+      Y: =3
+      Width: =13
+      Height: =13
+      Fill: =ColorValue(Switch(ThisItem.Tipo; "Recepción"; hxOk; "101"; hxOk; "Pago"; hxOk; "Rechazo"; hxCrit; "Llamada"; hxWarn; "Factura"; hxOkSuave; hxSuperficie))
+      BorderColor: =ColorValue(Switch(ThisItem.Tipo; "Rechazo"; hxCrit; "Llamada"; hxWarn; "Aviso"; hxAcento; "Solicitud"; hxAcento; "Edición"; hxAcento; "Nota"; hxTexto2; hxOk))
+      BorderThickness: =2
+      BorderStyle: =If(ThisItem.Tipo = "Aviso"; BorderStyle.Dashed; BorderStyle.Solid)
+
+  [rctHistLinea]
+      X: =7
+      Y: =0
+      Width: =1
+      Height: =lblHistDetalle.Y + lblHistDetalle.Height
+      Fill: =ColorValue(hxBorde)
+
+  [lblHistVacio]
+      FillPortions: =0
+      Height: =30
+      Visible: =IsEmpty(frHist)
+      Text: ="No hay movimientos con este filtro."
+      Size: =10
+      Color: =ColorValue(hxTexto2)
+
+
+Código 6.1 · lblHistMeta › Text
+
+    ----- inicio código (powerfx) -----
+ThisItem.Tipo & "  ·  " & Text(ThisItem.FechaEvento; "dd/mm/yyyy") & " " & Text(ThisItem.Created; "hh:mm") & "  ·  " &
+If(
+    ThisItem.Tipo = "Aviso";
+        "Sistema" & If(IsBlank(ThisItem.DestinatarioEmail); ""; " → " & ThisItem.DestinatarioEmail);
+    ThisItem.RegistradoPor &
+    If(IsBlank(ThisItem.EnNombreDe) Or ThisItem.EnNombreDe = ThisItem.RegistradoPor; ""; " (vista de " & ThisItem.EnNombreDe & ")") &
+    " · " & Switch(ThisItem.Area; "Proveedores"; "Atención a proveedores"; "Pagos"; "Cuentas por pagar"; ThisItem.Area)
+)
+    ----- fin código -----
+
+
+##############################################################################
+# 7. conReglas (botón Reglas de días)
+##############################################################################
+
+Va dentro de conRaiz, último. Dos columnas: a la izquierda plazos y equipo; a la derecha catálogo de proveedores, guía del flujo y pruebas. Solo el área Admin puede guardar.
+
+
+--- conReglas, conReglasGrid y columnas -----------------------------------
+
+
+  [conReglas]
+      FillPortions: =1
+      AlignInContainer: =AlignInContainer.SetByContainer
+      Visible: =varTab = "reglas"
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =16
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =16 en las cuatro
+      LayoutOverflowY: =LayoutOverflow.Scroll
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conReglasGrid]
+      FillPortions: =0
+      Height: =Max(conPlazos.Height + 16 + conEquipo.Height; conProveedores.Height + 16 + conGuia.Height + If(conPruebas.Visible; 16 + conPruebas.Height; 0)) + 4
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =16
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conColIzq]
+      FillPortions: =1
+      LayoutMinWidth: =420
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =16
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conColDer]
+      FillPortions: =1
+      LayoutMinWidth: =380
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =16
+      Fill: =RGBA(0; 0; 0; 0)
+
+
+--- conPlazos -------------------------------------------------------------
+
+
+  [conPlazos]
+      FillPortions: =0
+      Height: =420
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =0
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =0 en las cuatro
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =10 en las cuatro
+
+  [conPlazosHead]
+      FillPortions: =0
+      Height: =48
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =8
+      PaddingLeft: =14
+      PaddingRight: =14
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [lblPlazosTit]
+      FillPortions: =1
+      Height: =48
+      Text: ="Plazos del flujo"
+      Size: =13
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto)
+      PaddingLeft: =0
+
+  [lblPlazosSub]
+      FillPortions: =0
+      Width: =210
+      Height: =48
+      Text: ="DÍAS HÁBILES, LUNES A VIERNES"
+      Size: =8
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto2)
+      Align: =Align.Right
+
+  [conPlazoAlerta, conPlazoRellamada, conPlazo101, conPlazoCredito]
+      FillPortions: =0
+
+  [(los mismos cuatro)]
+      Height: =76
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =12
+      PaddingLeft: =14
+      PaddingRight: =14
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conPlazoAlertaTxt, conPlazoRellamadaTxt, conPlazo101Txt, conPlazoCreditoTxt]
+      FillPortions: =1
+
+  [(los mismos cuatro)]
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Center
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =2
+
+  [lblPlazoAlertaTit]
+      Text: ="Días sin factura para alertar a " & frPersonaProveedores
+
+  [lblPlazoRellamadaTit]
+      Text: ="Días entre llamadas"
+
+  [lblPlazo101Tit]
+      Text: ="Días máximos para dar el 101"
+
+  [lblPlazoCreditoTit]
+      Text: ="Crédito por defecto"
+
+  [lblPlazoAlertaTit, lblPlazoRellamadaTit, lblPlazo101Tit, lblPlazoCreditoTit]
+      FillPortions: =0
+
+  [(los mismos cuatro)]
+      Height: =22
+      Size: =11
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto)
+      PaddingLeft: =0
+
+  [lblPlazoAlertaDesc]
+      Text: ="Desde que bodega confirma la recepción. Al cumplirse, la PO pasa a Llamar al proveedor."
+
+  [lblPlazoRellamadaDesc]
+      Text: ="Si después de una llamada la factura no llega, se vuelve a pedir llamada."
+
+  [lblPlazo101Desc]
+      Text: ="Desde que hay recepción y factura. Si se pasa, " & frPersonaCompras & " ve la PO con alerta."
+
+  [lblPlazoCreditoDesc]
+      Text: ="Se propone al registrar una PO y define la fecha estimada de pago."
+
+  [lblPlazoAlertaDesc, lblPlazoRellamadaDesc, lblPlazo101Desc, lblPlazoCreditoDesc]
+      FillPortions: =0
+
+  [(los mismos cuatro)]
+      Height: =36
+      Size: =9
+      Color: =ColorValue(hxTexto2)
+      Wrap: =true
+      PaddingLeft: =0
+
+  [txtCfgAlerta]
+      Default: =Text(frDiasAlerta)
+
+  [txtCfgRellamada]
+      Default: =Text(frDiasRellamada)
+
+  [txtCfg101]
+      Default: =Text(frDias101)
+
+  [txtCfgCredito]
+      Default: =Text(frDiasCredito)
+
+  [txtCfgAlerta, txtCfgRellamada, txtCfg101, txtCfgCredito]
+      FillPortions: =0
+
+  [(los mismos cuatro)]
+      Width: =80
+      Height: =38
+      AlignInContainer: =AlignInContainer.Center
+      Format: =TextFormat.Number
+      Align: =Align.Right
+      Font: =Font.'Courier New'
+      Size: =13
+      Color: =ColorValue(hxTexto)
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      FocusedBorderColor: =ColorValue(hxAcento)
+      FocusedBorderThickness: =2
+      PaddingRight: =10
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+      DisplayMode: =If(frEsAdmin; DisplayMode.Edit; DisplayMode.View)
+
+  [lblPlazoAlertaUni, lblPlazoRellamadaUni, lblPlazo101Uni]
+      Text: ="días háb."
+
+  [lblPlazoCreditoUni]
+      Text: ="días nat."
+
+  [lblPlazoAlertaUni, lblPlazoRellamadaUni, lblPlazo101Uni, lblPlazoCreditoUni]
+      FillPortions: =0
+
+  [(los mismos cuatro)]
+      Width: =70
+      Height: =38
+      Size: =9
+      Color: =ColorValue(hxTexto2)
+      VerticalAlign: =VerticalAlign.Middle
+
+  [conPlazosPie]
+      FillPortions: =0
+      Height: =64
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =10
+      PaddingLeft: =14
+      PaddingRight: =14
+      Fill: =ColorValue(hxSuperficie2)
+      RadiusTopLeft / RadiusTopRight: =0 en las dos
+      RadiusBottomLeft / RadiusBottomRight: =10 en las dos
+
+  [lblPlazosNota]
+      FillPortions: =1
+      Height: =48
+      Text: =If(frEsAdmin; "Aplica a todos. Las fechas límite ya calculadas no cambian; las nuevas usan el plazo nuevo."; "Solo el administrador puede cambiar los plazos.")
+      Size: =9
+      Color: =ColorValue(hxTexto2)
+      Wrap: =true
+
+  [btnGuardarPlazos]
+      FillPortions: =0
+      Width: =140
+      Height: =36
+      Visible: =frEsAdmin
+      Text: ="Guardar plazos"
+      Size: =10
+      FontWeight: =FontWeight.Semibold
+      Fill: =ColorValue(hxAcento)
+      Color: =Color.White
+      HoverFill: =ColorValue(hxTinta)
+      HoverColor: =Color.White
+      BorderThickness: =0
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+      OnSelect: código 7.1
+
+
+--- conEquipo -------------------------------------------------------------
+
+
+  [conEquipo]
+      FillPortions: =0
+      Height: =40 + Max(CountRows(colEquipo); 1) * 48 + If(frEsAdmin; 52; 0) + 36
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =8
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =14 en las cuatro
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =10 en las cuatro
+
+  [lblEquipoTit]
+      FillPortions: =0
+      Height: =28
+      Text: ="Equipo"
+      Size: =13
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto)
+
+  [galEquipo]
+      FillPortions: =0
+      Height: =Max(CountRows(colEquipo); 1) * 48
+      Items: =Sort(colEquipo; Area; SortOrder.Ascending)
+      TemplateSize: =48
+      TemplatePadding: =0
+      ShowScrollbar: =false
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [icoEqQuitar]
+      X: =Parent.TemplateWidth - 36
+      Y: =10
+      Width: =28
+      Height: =28
+      Icon: =Icon.Cancel
+      Color: =ColorValue(hxCrit)
+      Visible: =frEsAdmin And Lower(ThisItem.Email) <> varEmail
+      Tooltip: ="Quitar del equipo"
+      OnSelect: =Patch(TRZ_Equipo; LookUp(TRZ_Equipo; ID = ThisItem.ID); {Activo: false});; Remove(colEquipo; ThisItem)
+
+  [lblEqNombre]
+      X: =0
+      Y: =0
+      Width: =Parent.TemplateWidth * 0,3
+      Height: =47
+      Text: =ThisItem.Title
+      Size: =10
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto)
+      VerticalAlign: =VerticalAlign.Middle
+
+  [lblEqArea]
+      X: =Parent.TemplateWidth * 0,3
+      Y: =0
+      Width: =Parent.TemplateWidth * 0,3
+      Height: =47
+      Text: =Switch(ThisItem.Area; "Proveedores"; "Atención a proveedores"; "Pagos"; "Cuentas por pagar"; ThisItem.Area)
+      Size: =10
+      Color: =ColorValue(hxTexto)
+      VerticalAlign: =VerticalAlign.Middle
+
+  [lblEqEmail]
+      X: =Parent.TemplateWidth * 0,6
+      Y: =0
+      Width: =Parent.TemplateWidth * 0,4 - 40
+      Height: =47
+      Text: =ThisItem.Email
+      Size: =9
+      Color: =ColorValue(hxTexto2)
+      VerticalAlign: =VerticalAlign.Middle
+      Wrap: =false
+
+  [rctEqDiv]
+      X: =0
+      Y: =47
+      Width: =Parent.TemplateWidth
+      Height: =1
+      Fill: =ColorValue(hxBorde)
+
+  [conEqNuevo]
+      FillPortions: =0
+      Height: =44
+      Visible: =frEsAdmin
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =8
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [txtEqNombre]
+      HintText: ="Nombre"
+
+  [txtEqEmail]
+      HintText: ="correo@empresa.com"
+
+  [txtEqNombre, txtEqEmail]
+      FillPortions: =1
+
+  [(los mismos dos)]
+      Height: =38
+      Default: =""
+      Size: =10
+      Color: =ColorValue(hxTexto)
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      FocusedBorderColor: =ColorValue(hxAcento)
+      PaddingLeft: =10
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+
+  [drpEqArea]
+      FillPortions: =0
+      Width: =150
+      Height: =38
+      Items: =["Compras"; "Bodega"; "Proveedores"; "Pagos"; "Admin"]
+      Default: ="Bodega"
+      Size: =10
+      Color: =ColorValue(hxTexto)
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      ChevronBackground: =ColorValue(hxSuperficie)
+      ChevronFill: =ColorValue(hxTexto2)
+      SelectionFill: =ColorValue(hxAcento)
+      SelectionColor: =Color.White
+
+  [btnEqAgregar]
+      FillPortions: =0
+      Width: =100
+      Height: =36
+      Text: ="Agregar"
+      Size: =10
+      FontWeight: =FontWeight.Semibold
+      Fill: =ColorValue(hxAcento)
+      Color: =Color.White
+      HoverFill: =ColorValue(hxTinta)
+      BorderThickness: =0
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+      OnSelect: código 7.2
+
+
+--- conProveedores, conGuia y conPruebas ----------------------------------
+
+
+  [conProveedores]
+      FillPortions: =0
+      Height: =28 + galProveedores.Height + If(frEsAdmin; 52; 0) + 60 + 44
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =8
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =14 en las cuatro
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =10 en las cuatro
+
+  [lblProvTit]
+      FillPortions: =0
+      Height: =28
+      Text: ="Catálogo de proveedores  ·  " & CountRows(colProveedores)
+      Size: =13
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto)
+
+  [galProveedores]
+      FillPortions: =0
+      Height: =Min(Max(RoundUp(CountRows(colProveedores) / 2; 0); 1); 8) * 40
+      Items: =Sort(colProveedores; Title; SortOrder.Ascending)
+      WrapCount: =2
+      TemplateSize: =40
+      TemplatePadding: =0
+      ShowScrollbar: =true
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [icoProvQuitar]
+      X: =Parent.TemplateWidth - 40
+      Y: =6
+      Width: =28
+      Height: =28
+      Icon: =Icon.Cancel
+      Color: =ColorValue(hxTexto2)
+      Visible: =frEsAdmin
+      Tooltip: ="Quitar del catálogo"
+      OnSelect: =Patch(TRZ_Proveedores; LookUp(TRZ_Proveedores; ID = ThisItem.ID); {Activo: false});; Remove(colProveedores; ThisItem)
+
+  [lblProvNom]
+      X: =0
+      Y: =4
+      Width: =Parent.TemplateWidth - 8
+      Height: =32
+      Text: =ThisItem.Title
+      Size: =10
+      Color: =ColorValue(hxTexto)
+      Fill: =ColorValue(hxSuperficie2)
+      PaddingLeft: =12
+      PaddingRight: =40
+      Wrap: =false
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =16 en las cuatro
+
+  [conProvNuevo]
+      FillPortions: =0
+      Height: =44
+      Visible: =frEsAdmin
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =8
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [txtNuevoProv]
+      FillPortions: =1
+      Height: =38
+      Default: =""
+      HintText: ="Nombre del proveedor"
+      Size: =10
+      Color: =ColorValue(hxTexto)
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      FocusedBorderColor: =ColorValue(hxAcento)
+      PaddingLeft: =10
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+
+  [btnAgregarProv]
+      FillPortions: =0
+      Width: =100
+      Height: =36
+      Text: ="Agregar"
+      Size: =10
+      FontWeight: =FontWeight.Semibold
+      Fill: =ColorValue(hxAcento)
+      Color: =Color.White
+      HoverFill: =ColorValue(hxTinta)
+      BorderThickness: =0
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+      OnSelect: código 7.3
+
+  [lblProvNota]
+      FillPortions: =0
+      Height: =52
+      Text: ="Los proveedores escritos en Texto libre al registrar una PO se agregan solos a esta lista. Esta lista alimenta el modo Lista del campo Proveedor."
+      Size: =9
+      Color: =ColorValue(hxTexto2)
+      Wrap: =true
+
+  [conGuia]
+      FillPortions: =0
+      Height: =300
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =8
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =14 en las cuatro
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =10 en las cuatro
+
+  [lblGuiaTit]
+      FillPortions: =0
+      Height: =28
+      Text: ="Cómo avanza una orden"
+      Size: =13
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto)
+
+  [htmlGuia]
+      FillPortions: =1
+      HtmlText: =frHtmlGuia
+      AutoHeight: =false
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =0 en las cuatro
+
+  [conPruebas]
+      FillPortions: =0
+      Height: =168
+      Visible: =frEsAdmin
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =8
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =14 en las cuatro
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =10 en las cuatro
+
+  [lblPruebasTit]
+      FillPortions: =0
+      Height: =28
+      Text: ="Pruebas: fecha de trabajo"
+      Size: =13
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto)
+
+  [conPruebasFila]
+      FillPortions: =0
+      Height: =40
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =8
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [dpFechaTrabajo]
+      FillPortions: =0
+      Width: =200
+      Height: =38
+      DefaultDate: =varHoy
+      Format: =DateTimeFormat.ShortDate
+      Language: ="es-ES"
+      IsEditable: =false
+      Size: =10
+      Color: =ColorValue(hxTexto)
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      IconFill: =Color.White
+      IconBackground: =ColorValue(hxAcento)
+      OnChange: =Set(varHoy; Self.SelectedDate)
+
+  [btnHoyReal]
+      FillPortions: =0
+      Width: =130
+      Height: =36
+      Text: ="Volver a hoy"
+      Size: =10
+      Fill: =ColorValue(hxSuperficie)
+      Color: =ColorValue(hxTexto)
+      HoverFill: =ColorValue(hxSuperficie2)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+      OnSelect: =Set(varHoy; Today());; Reset(dpFechaTrabajo)
+
+  [lblPruebasNota]
+      FillPortions: =0
+      Height: =44
+      Text: ="Adelanta la fecha para ver cuándo se disparan las alertas. Lo que registres se guarda con esa fecha: úsalo solo con POs de prueba."
+      Size: =9
+      Color: =ColorValue(hxWarn)
+      Wrap: =true
+
+
+Código 7.1 · btnGuardarPlazos › OnSelect
+
+    ----- inicio código (powerfx) -----
+With(
+    {
+        a: Value(txtCfgAlerta.Text);
+        r: Value(txtCfgRellamada.Text);
+        d: Value(txtCfg101.Text);
+        c: Value(txtCfgCredito.Text)
+    };
+    If(
+        IsBlank(a) Or IsBlank(r) Or IsBlank(d) Or IsBlank(c) Or a < 1 Or r < 1 Or d < 1 Or c < 0;
+            Notify("Revisa los plazos: números enteros, mínimo 1 (crédito mínimo 0)."; NotificationType.Error);
+        Patch(TRZ_Config; LookUp(TRZ_Config; ID = frCfg.ID);
+            {DiasAlerta: Round(a; 0); DiasRellamada: Round(r; 0); Dias101: Round(d; 0); DiasCredito: Round(c; 0)}
+        );;
+        If(
+            IsEmpty(Errors(TRZ_Config));
+                ClearCollect(colConfig; FirstN(TRZ_Config; 1));;
+                Notify("Plazos actualizados."; NotificationType.Success);
+            Notify("No se guardaron los plazos: " & First(Errors(TRZ_Config)).Message; NotificationType.Error)
+        )
+    )
+)
+    ----- fin código -----
+
+
+Código 7.2 · btnEqAgregar › OnSelect
+
+    ----- inicio código (powerfx) -----
+If(
+    IsBlank(Trim(txtEqNombre.Text)) Or !IsMatch(Trim(txtEqEmail.Text); Match.Email);
+        Notify("Escribe el nombre y un correo válido."; NotificationType.Error);
+    !IsBlank(LookUp(colEquipo; Lower(Email) = Lower(Trim(txtEqEmail.Text))));
+        Notify("Ese correo ya está en el equipo."; NotificationType.Warning);
+    Collect(colEquipo;
+        Patch(TRZ_Equipo; Defaults(TRZ_Equipo);
+            {Title: Trim(txtEqNombre.Text); Email: Lower(Trim(txtEqEmail.Text)); Area: drpEqArea.Selected.Value; Activo: true}
+        )
+    );;
+    Reset(txtEqNombre);;
+    Reset(txtEqEmail);;
+    Notify("Persona agregada al equipo."; NotificationType.Success)
+)
+    ----- fin código -----
+
+
+Código 7.3 · btnAgregarProv › OnSelect
+
+    ----- inicio código (powerfx) -----
+If(
+    IsBlank(Trim(txtNuevoProv.Text));
+        Notify("Escribe el nombre del proveedor."; NotificationType.Error);
+    !IsBlank(LookUp(colProveedores; Lower(Title) = Lower(Trim(txtNuevoProv.Text))));
+        Notify("Ese proveedor ya está en el catálogo."; NotificationType.Warning);
+    Collect(colProveedores; Patch(TRZ_Proveedores; Defaults(TRZ_Proveedores); {Title: Trim(txtNuevoProv.Text); Activo: true}));;
+    Reset(txtNuevoProv);;
+    Notify("Proveedor agregado al catálogo."; NotificationType.Success)
+)
+    ----- fin código -----
+
+
+##############################################################################
+# 8. conModalPO (modal Nueva PO / Editar)
+##############################################################################
+
+Va directo en scrTraza, arriba de conRaiz en la vista de árbol para quedar al frente. Lo abren btnNuevaPO (modo nueva) y la acción Editar datos de la PO (modo editar).
+
+
+--- conModalPO y conModalCaja ---------------------------------------------
+
+
+  [conModalPO]
+      X: =0
+      Y: =0
+      Width: =Parent.Width
+      Height: =Parent.Height
+      Visible: =varModalPO
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Center
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =0
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =16 en las cuatro
+      Fill: =RGBA(0; 0; 0; 0,45)
+      BorderThickness: =0
+
+  [conModalCaja]
+      FillPortions: =0
+      Width: =Min(640; Parent.Width - 32)
+      Height: =Min(660; Parent.Height - 32)
+      AlignInContainer: =AlignInContainer.Center
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutJustifyContent: =LayoutJustifyContent.Start
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =10
+      PaddingTop / PaddingBottom / PaddingLeft / PaddingRight: =20 en las cuatro
+      LayoutOverflowY: =LayoutOverflow.Scroll
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =12 en las cuatro
+      DropShadow: =DropShadow.Bold
+
+  [lblModalTit]
+      FillPortions: =0
+      Height: =32
+      Text: =If(varModoPO = "nueva"; "Nueva orden de compra"; "Editar PO " & frPORaw.Title)
+      Size: =16
+      FontWeight: =FontWeight.Bold
+      Color: =ColorValue(hxTexto)
+      PaddingLeft: =0
+
+
+--- Contenedores internos del modal ---------------------------------------
+
+
+  [conMPO]
+      FillPortions: =0
+      Height: =64
+      Visible: =varModoPO = "nueva"
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =12
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conMPONum, conMPOFecha, conMCant, conMCred]
+      FillPortions: =1
+
+  [(los mismos cuatro)]
+      AlignInContainer: =AlignInContainer.Stretch
+      LayoutDirection: =LayoutDirection.Vertical
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =4
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conMProvHead]
+      FillPortions: =0
+      Height: =32
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =0
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conMNums]
+      FillPortions: =0
+      Height: =64
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutAlignItems: =LayoutAlignItems.Stretch
+      LayoutGap: =12
+      Fill: =RGBA(0; 0; 0; 0)
+
+  [conModalBtns]
+      FillPortions: =0
+      Height: =44
+      LayoutDirection: =LayoutDirection.Horizontal
+      LayoutJustifyContent: =LayoutJustifyContent.End
+      LayoutAlignItems: =LayoutAlignItems.Center
+      LayoutGap: =8
+      Fill: =RGBA(0; 0; 0; 0)
+
+
+--- Etiquetas del modal ---------------------------------------------------
+
+
+  [lblMPO]
+      Text: ="Número de PO"
+
+  [lblMFecha]
+      Text: ="Fecha de solicitud"
+
+  [lblMProv]
+      Text: ="Proveedor"
+
+  [lblMDesc]
+      Text: ="Descripción"
+
+  [lblMCant]
+      Text: ="Cantidad"
+
+  [lblMCred]
+      Text: ="Días de crédito"
+
+  [lblMPdf]
+      Text: ="PDF de la PO (opcional · nombre del archivo o enlace)"
+
+  [lblMProv]
+      FillPortions: =1
+      Height: =32
+
+  [lblMPO, lblMFecha, lblMDesc, lblMCant, lblMCred, lblMPdf]
+      FillPortions: =0
+
+  [(los mismos seis)]
+      Height: =18
+
+  [lblMPO, lblMFecha, lblMProv, lblMDesc, lblMCant, lblMCred, lblMPdf]
+      Size: =9
+
+  [(los mismos siete)]
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxTexto2)
+      PaddingLeft: =0
+
+  [lblErrPO]
+      FillPortions: =0
+      Height: =24
+      Visible: =!IsBlank(varErrPO)
+      Text: =varErrPO
+      Size: =10
+      FontWeight: =FontWeight.Semibold
+      Color: =ColorValue(hxCrit)
+      PaddingLeft: =0
+
+
+--- Campos del modal ------------------------------------------------------
+
+
+  [txtPO]
+      Default: =""
+      HintText: ="4500018300"
+      Font: =Font.'Courier New'
+
+  [txtProveedor]
+      Default: =If(varModoPO = "editar"; frPORaw.Proveedor; "")
+      HintText: ="Escribe el nombre del proveedor"
+      Visible: =varModoProv = "texto"
+
+  [txtDescripcion]
+      Default: =If(varModoPO = "editar"; frPORaw.Descripcion; "")
+      HintText: ="Ej. Nitrato de calcio 25 kg"
+
+  [txtCantidad]
+      Default: =If(varModoPO = "editar"; frPORaw.Cantidad; "")
+      HintText: ="Ej. 40 sacos"
+
+  [txtDiasCredito]
+      Default: =Text(If(varModoPO = "editar"; Coalesce(frPORaw.DiasCredito; frDiasCredito); frDiasCredito))
+      Format: =TextFormat.Number
+
+  [txtPdf]
+      Default: =If(varModoPO = "editar"; frPORaw.PdfUrl; "")
+      HintText: ="OC_4500018300.pdf o https://…"
+
+  [txtPO, txtProveedor, txtDescripcion, txtCantidad, txtDiasCredito, txtPdf]
+      FillPortions: =0
+
+  [(los mismos seis)]
+      Height: =40
+      Mode: =TextMode.SingleLine
+      Size: =11
+      Color: =ColorValue(hxTexto)
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      FocusedBorderColor: =ColorValue(hxAcento)
+      FocusedBorderThickness: =2
+      PaddingLeft: =10
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+
+  [dpFechaSolicitud]
+      FillPortions: =0
+      Height: =40
+      DefaultDate: =varHoy
+      Format: =DateTimeFormat.ShortDate
+      Language: ="es-ES"
+      IsEditable: =false
+      Size: =11
+      Color: =ColorValue(hxTexto)
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      IconFill: =Color.White
+      IconBackground: =ColorValue(hxAcento)
+
+  [btnProvLista]
+      FillPortions: =0
+      Width: =90
+      Height: =28
+      Text: ="Lista"
+      Fill: =If(varModoProv = "lista"; ColorValue(hxTexto); ColorValue(hxSuperficie))
+      Color: =If(varModoProv = "lista"; Color.White; ColorValue(hxTexto2))
+      HoverFill: =If(varModoProv = "lista"; ColorValue(hxTexto); ColorValue(hxSuperficie2))
+      HoverColor: =If(varModoProv = "lista"; Color.White; ColorValue(hxTexto))
+      RadiusTopLeft / RadiusBottomLeft: =8 en las dos
+      RadiusTopRight / RadiusBottomRight: =0 en las dos
+      OnSelect: =Set(varModoProv; "lista")
+
+  [btnProvTexto]
+      FillPortions: =0
+      Width: =100
+      Height: =28
+      Text: ="Texto libre"
+      Fill: =If(varModoProv = "texto"; ColorValue(hxTexto); ColorValue(hxSuperficie))
+      Color: =If(varModoProv = "texto"; Color.White; ColorValue(hxTexto2))
+      HoverFill: =If(varModoProv = "texto"; ColorValue(hxTexto); ColorValue(hxSuperficie2))
+      HoverColor: =If(varModoProv = "texto"; Color.White; ColorValue(hxTexto))
+      RadiusTopLeft / RadiusBottomLeft: =0 en las dos
+      RadiusTopRight / RadiusBottomRight: =8 en las dos
+      OnSelect: =Set(varModoProv; "texto")
+
+  [btnProvLista, btnProvTexto]
+      Size: =9
+
+  [(los mismos dos)]
+      FontWeight: =FontWeight.Semibold
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+
+  [cmbProveedor]
+      FillPortions: =0
+      Height: =40
+      Visible: =varModoProv = "lista"
+      Items: =frListaProveedores
+      DisplayFields: =["Value"]
+      SearchFields: =["Value"]
+      SelectMultiple: =false
+      IsSearchable: =true
+      DefaultSelectedItems: =If(varModoPO = "editar"; Filter(frListaProveedores; Value = frPORaw.Proveedor))
+      InputTextPlaceholder: ="Selecciona un proveedor"
+      Size: =11
+      Color: =ColorValue(hxTexto)
+      Fill: =ColorValue(hxSuperficie)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      ChevronBackground: =ColorValue(hxSuperficie)
+      ChevronFill: =ColorValue(hxTexto2)
+      SelectionFill: =ColorValue(hxAcentoSuave)
+      SelectionColor: =ColorValue(hxTexto)
+
+  [btnCancelarPO]
+      FillPortions: =0
+      Width: =110
+      Height: =38
+      Text: ="Cancelar"
+      Size: =10
+      Fill: =ColorValue(hxSuperficie)
+      Color: =ColorValue(hxTexto)
+      HoverFill: =ColorValue(hxSuperficie2)
+      HoverColor: =ColorValue(hxTexto)
+      BorderColor: =ColorValue(hxBorde)
+      BorderThickness: =1
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+      OnSelect: =Set(varModalPO; false);; Set(varErrPO; "")
+
+  [btnGuardarPO]
+      FillPortions: =0
+      Width: =160
+      Height: =38
+      Text: =If(varModoPO = "nueva"; "Registrar PO"; "Guardar cambios")
+      Size: =10
+      FontWeight: =FontWeight.Semibold
+      Fill: =ColorValue(hxAcento)
+      Color: =Color.White
+      HoverFill: =ColorValue(hxTinta)
+      HoverColor: =Color.White
+      BorderThickness: =0
+      DisplayMode: =If(varGuardando; DisplayMode.Disabled; DisplayMode.Edit)
+      DisabledFill: =ColorValue(hxBorde)
+      DisabledColor: =ColorValue(hxTexto2)
+      RadiusTopLeft / RadiusTopRight / RadiusBottomLeft / RadiusBottomRight: =8 en las cuatro
+      OnSelect: código 8.1
+
+
+Código 8.1 · btnGuardarPO › OnSelect
+
+    ----- inicio código (powerfx) -----
+Set(varGuardando; true);;
+With(
+    {
+        po: Trim(txtPO.Text);
+        prov: Trim(If(varModoProv = "lista"; cmbProveedor.Selected.Value; txtProveedor.Text));
+        cred: Coalesce(Value(txtDiasCredito.Text); frDiasCredito)
+    };
+    If(
+        varModoPO = "nueva" And IsBlank(po); Set(varErrPO; "Escribe el número de PO.");
+        IsBlank(prov); Set(varErrPO; "Indica el proveedor.");
+        IsBlank(Trim(txtDescripcion.Text)); Set(varErrPO; "Escribe la descripción.");
+        varModoPO = "nueva" And !IsBlank(LookUp(TRZ_OrdenesCompra; Title = po)); Set(varErrPO; "La PO " & po & " ya está registrada. Búscala en Órdenes de compra.");
+
+        // ---------- NUEVA PO ----------
+        varModoPO = "nueva";
+            Set(varErrPO; "");;
+            Set(varRes; Patch(TRZ_OrdenesCompra; Defaults(TRZ_OrdenesCompra);
+                {
+                    Title: po;
+                    Proveedor: prov;
+                    Descripcion: Trim(txtDescripcion.Text);
+                    Cantidad: Trim(txtCantidad.Text);
+                    PdfUrl: Trim(txtPdf.Text);
+                    DiasCredito: cred;
+                    FechaSolicitud: Coalesce(dpFechaSolicitud.SelectedDate; varHoy);
+                    SolicitadoPor: User().FullName;
+                    Llamadas: 0;
+                    Rechazos: 0;
+                    Etapa: "Solicitada";
+                    Cerrada: 0;
+                    UltimoMovimiento: Now()
+                }
+            ));;
+            If(
+                IsEmpty(Errors(TRZ_OrdenesCompra));
+                    Collect(colOrdenes; varRes);;
+                    Patch(TRZ_HistorialPO; Defaults(TRZ_HistorialPO); frFirma;
+                        {
+                            Title: po; OrdenID: varRes.ID; Tipo: "Solicitud"; FechaEvento: varRes.FechaSolicitud;
+                            Detalle: "PO registrada con estatus Solicitado" &
+                                If(IsBlank(varRes.Cantidad); ""; " · " & varRes.Cantidad) &
+                                If(IsBlank(varRes.PdfUrl); ""; " · PDF adjunto")
+                        }
+                    );;
+                    If(IsBlank(LookUp(colProveedores; Lower(Title) = Lower(prov)));
+                        Collect(colProveedores; Patch(TRZ_Proveedores; Defaults(TRZ_Proveedores); {Title: prov; Activo: true}))
+                    );;
+                    Set(varPOId; varRes.ID);;
+                    ClearCollect(colHist; Sort(Filter(TRZ_HistorialPO; OrdenID = varPOId); ID; SortOrder.Descending));;
+                    Set(varAccion; "");;
+                    Set(varChip; "pendientes");;
+                    Set(varEtapaFiltro; "Todas");;
+                    Set(varModalPO; false);;
+                    Set(varTab; "ordenes");;
+                    Notify("PO " & po & " registrada como Solicitada."; NotificationType.Success);
+                Notify("No se guardó la PO: " & First(Errors(TRZ_OrdenesCompra)).Message; NotificationType.Error)
+            );
+
+        // ---------- EDITAR PO ----------
+        Set(varPOAct; LookUp(TRZ_OrdenesCompra; ID = varPOId));;
+        Set(varCambios;
+            Concat(
+                Filter(
+                    Table(
+                        {C: "Proveedor"; A: varPOAct.Proveedor; B: prov};
+                        {C: "Descripción"; A: varPOAct.Descripcion; B: Trim(txtDescripcion.Text)};
+                        {C: "Cantidad"; A: varPOAct.Cantidad; B: Trim(txtCantidad.Text)};
+                        {C: "PDF"; A: varPOAct.PdfUrl; B: Trim(txtPdf.Text)};
+                        {C: "Días de crédito"; A: Text(varPOAct.DiasCredito); B: Text(cred)}
+                    );
+                    Coalesce(A; "") <> Coalesce(B; "")
+                );
+                C & ": " & Coalesce(A; "—") & " → " & Coalesce(B; "—");
+                "  ·  "
+            )
+        );;
+        If(
+            IsBlank(varCambios); Set(varErrPO; "No hay cambios que guardar.");
+            !IsBlank(varPOAct.FechaPago); Set(varErrPO; "La PO ya está pagada y no se puede editar.");
+            Set(varRes; Patch(TRZ_OrdenesCompra; varPOAct;
+                {
+                    Proveedor: prov;
+                    Descripcion: Trim(txtDescripcion.Text);
+                    Cantidad: Trim(txtCantidad.Text);
+                    PdfUrl: Trim(txtPdf.Text);
+                    DiasCredito: cred;
+                    FechaPagoEstimada: If(!IsBlank(varPOAct.Fecha101) And !IsBlank(varPOAct.FechaFactura);
+                        DateAdd(varPOAct.Fecha101; cred; TimeUnit.Days); varPOAct.FechaPagoEstimada);
+                    UltimoMovimiento: Now()
+                }
+            ));;
+            If(
+                IsEmpty(Errors(TRZ_OrdenesCompra));
+                    Patch(TRZ_HistorialPO; Defaults(TRZ_HistorialPO); frFirma;
+                        {Title: varPOAct.Title; OrdenID: varPOId; Tipo: "Edición"; FechaEvento: varHoy; Detalle: varCambios}
+                    );;
+                    If(IsBlank(LookUp(colProveedores; Lower(Title) = Lower(prov)));
+                        Collect(colProveedores; Patch(TRZ_Proveedores; Defaults(TRZ_Proveedores); {Title: prov; Activo: true}))
+                    );;
+                    Patch(colOrdenes; LookUp(colOrdenes; ID = varPOId); varRes);;
+                    ClearCollect(colHist; Sort(Filter(TRZ_HistorialPO; OrdenID = varPOId); ID; SortOrder.Descending));;
+                    Set(varErrPO; "");;
+                    Set(varModalPO; false);;
+                    Notify("Datos de la PO actualizados."; NotificationType.Success);
+                Notify("No se guardó: " & First(Errors(TRZ_OrdenesCompra)).Message; NotificationType.Error)
+            )
+        )
+    )
+);;
+Set(varGuardando; false)
+    ----- fin código -----
+
+
+******************************************************************************
+PARTE 4 · FLUJOS DE POWER AUTOMATE
+******************************************************************************
+
+
+##############################################################################
+# 0. Antes de empezar
+##############################################################################
+
+La app nunca llama a un flujo: escribe un registro con Tipo = "Aviso" en TRZ_HistorialPO. El Flujo 1 envía ese aviso por correo. El Flujo 2 revisa cada mañana las fechas límite y crea los avisos de las PO vencidas, que también envía el Flujo 1.
+
+  - Entorno: El mismo de la app (recomendado: crear ambos flujos dentro de una solución llamada TRZ)
+  - Conector 1: SharePoint, con una cuenta que tenga permiso Contribuir en las cinco listas
+  - Conector 2: Office 365 Outlook (la cuenta que envía; si usan buzón compartido, usa "Enviar un correo electrónico desde un buzón compartido (V2)")
+  - Dirección del sitio: La URL del sitio de SharePoint donde están las listas TRZ_
+  - Zona horaria: (UTC-06:00) América Central · en expresiones: 'Central America Standard Time'
+  - Enlace de la app: Power Apps › la app › Detalles › Vínculo web (lo usas en el cuerpo del correo)
+  - Columnas indexadas: Etapa, Cerrada, FechaAlertaFactura, FechaLimite101 y FechaFactura en TRZ_OrdenesCompra; Tipo en TRZ_HistorialPO
+
+
+Nombra cada acción exactamente como dice "Nombre de la acción": las expresiones usan ese nombre con guiones bajos en lugar de espacios (por ejemplo, la acción "Correos Compras" se lee con outputs('Correos_Compras')). Para renombrar: menú "…" de la acción › Cambiar nombre, antes de usarla en otra acción.
+
+Las expresiones se pegan en la pestaña Expresión (fx) del campo. Los valores escritos como @{...} dentro de un texto se pegan tal cual en el campo.
+
+
+##############################################################################
+# 1. Flujo 1 · TRZ Enviar avisos
+##############################################################################
+
+Tipo: Flujo de nube automatizado. Se ejecuta cada vez que se crea un registro de aviso en TRZ_HistorialPO y envía un correo a los destinatarios guardados en ese registro.
+
+Creación: Power Automate › Crear › Flujo de nube automatizado › Nombre del flujo TRZ Enviar avisos › desencadenador "Cuando se crea un elemento" (SharePoint) › Crear.
+
+
+  Paso 1 · Cuando se crea un aviso (desencadenador "Cuando se crea un elemento")
+      Dirección del sitio: URL del sitio de SharePoint
+      Nombre de la lista: TRZ_HistorialPO
+      Configuración › Condiciones del desencadenador: @and(equals(triggerBody()?['Tipo'], 'Aviso'), not(empty(triggerBody()?['DestinatarioEmail'])))
+      Configuración › Control de simultaneidad: Desactivado
+
+  Paso 2 · Destinatarios (acción "Inicializar variable")
+      Nombre: vDestinatarios
+      Tipo: Cadena
+      Valor (expresión): replace(replace(trim(triggerBody()?['DestinatarioEmail']), ' ', ''), ';;', ';')
+
+  Paso 3 · Asunto (acción "Redactar")
+      Entradas (expresión): concat('PO ', triggerBody()?['Title'], ' · aviso de trazabilidad de compras')
+
+  Paso 4 · Fecha aviso (acción "Redactar")
+      Entradas (expresión): formatDateTime(triggerBody()?['FechaEvento'], 'dd/MM/yyyy')
+
+  Paso 5 · Cuerpo (acción "Redactar")
+      Entradas: el HTML del bloque de abajo
+
+  Paso 6 · Enviar aviso (acción "Enviar un correo electrónico (V2)")
+      Para: @{variables('vDestinatarios')}
+      Asunto: @{outputs('Asunto')}
+      Cuerpo: @{outputs('Cuerpo')} (en el editor, botón de código </> para pegarlo como HTML)
+      Mostrar opciones avanzadas › Importancia: Normal
+      Mostrar opciones avanzadas › Es HTML: Sí
+      Mostrar opciones avanzadas › De (Enviar como): Opcional: el buzón compartido del área
+
+
+Entradas de la acción Cuerpo (reemplaza URL_DE_LA_APP por el vínculo web de la app):
+
+    ----- inicio código (html) -----
+<div style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#16202C">
+  <p style="margin:0 0 8px 0"><b>PO @{triggerBody()?['Title']}</b></p>
+  <p style="margin:0 0 12px 0">@{triggerBody()?['Detalle']}</p>
+  <p style="margin:0;font-size:12px;color:#5A6777">
+    Fecha del registro: @{outputs('Fecha_aviso')}<br>
+    Abrir la app: <a href="URL_DE_LA_APP">Trazabilidad de Compras</a>
+  </p>
+  <p style="margin:12px 0 0 0;font-size:11px;color:#5A6777">Mensaje automático del sistema de trazabilidad de órdenes de compra.</p>
+</div>
+    ----- fin código -----
+
+
+Guarda y prueba: registra una recepción en la app y revisa que llegue el correo a Lorena y Zoila.
+
+
+##############################################################################
+# 2. Flujo 2 · TRZ Alertas diarias
+##############################################################################
+
+Tipo: Flujo de nube programado. De lunes a viernes a las 07:00 busca las PO vencidas en cuatro condiciones y crea un aviso por cada una en TRZ_HistorialPO; el Flujo 1 envía los correos. Como la app guardó las fechas límite en días hábiles, aquí solo se comparan fechas.
+
+Creación: Power Automate › Crear › Flujo de nube programado › Nombre TRZ Alertas diarias › Repetir cada 1 Semana › Crear. Luego ajusta la periodicidad como dice el paso 1.
+
+
+--- Pasos 1 a 3: fecha de hoy y correos del equipo ------------------------
+
+
+  Paso 1 · Periodicidad (desencadenador)
+      Intervalo: 1
+      Frecuencia: Semana
+      Zona horaria: (UTC-06:00) América Central
+      En estos días: Lunes, Martes, Miércoles, Jueves, Viernes
+      A estas horas: 7
+      En estos minutos: 0
+
+  Paso 2 · Hoy (acción "Inicializar variable")
+      Nombre: vHoy
+      Tipo: Cadena
+      Valor (expresión): formatDateTime(convertFromUtc(utcNow(), 'Central America Standard Time'), 'yyyy-MM-dd')
+
+  Paso 3a · Obtener equipo (acción "Obtener elementos")
+      Dirección del sitio: URL del sitio de SharePoint
+      Nombre de la lista: TRZ_Equipo
+      Consulta de filtro: Activo eq 1
+      Recuento superior: 100
+
+  Paso 3b · Filtrar Proveedores (acción "Filtrar matriz")
+      Desde (expresión): outputs('Obtener_equipo')?['body/value']
+      Condición (modo avanzado): @equals(item()?['Area'], 'Proveedores')
+
+  Paso 3c · Lista Proveedores (acción "Seleccionar")
+      Desde (expresión): body('Filtrar_Proveedores')
+      Asignar (modo texto, expresión): item()?['Email']
+
+  Paso 3d · Correos Proveedores (acción "Redactar")
+      Entradas (expresión): join(body('Lista_Proveedores'), ';')
+
+  Paso 3e · Filtrar Compras ("Filtrar matriz")
+      Desde (expresión): outputs('Obtener_equipo')?['body/value']
+      Condición (modo avanzado): @equals(item()?['Area'], 'Compras')
+
+  Paso 3f · Lista Compras ("Seleccionar")
+      Desde (expresión): body('Filtrar_Compras')
+      Asignar (modo texto, expresión): item()?['Email']
+
+  Paso 3g · Correos Compras ("Redactar")
+      Entradas (expresión): join(body('Lista_Compras'), ';')
+
+  Paso 3h · Filtrar Bodega ("Filtrar matriz")
+      Desde (expresión): outputs('Obtener_equipo')?['body/value']
+      Condición (modo avanzado): @equals(item()?['Area'], 'Bodega')
+
+  Paso 3i · Lista Bodega ("Seleccionar")
+      Desde (expresión): body('Filtrar_Bodega')
+      Asignar (modo texto, expresión): item()?['Email']
+
+  Paso 3j · Correos Bodega ("Redactar")
+      Entradas (expresión): join(body('Lista_Bodega'), ';')
+
+  Paso 3k · Filtrar Pagos ("Filtrar matriz")
+      Desde (expresión): outputs('Obtener_equipo')?['body/value']
+      Condición (modo avanzado): @equals(item()?['Area'], 'Pagos')
+
+  Paso 3l · Lista Pagos ("Seleccionar")
+      Desde (expresión): body('Filtrar_Pagos')
+      Asignar (modo texto, expresión): item()?['Email']
+
+  Paso 3m · Correos Pagos ("Redactar")
+      Entradas (expresión): join(body('Lista_Pagos'), ';')
+
+
+--- Paso 4: PO sin factura en el plazo (aviso a Atención a proveedores) ---
+
+
+  Paso 4a · Obtener sin factura ("Obtener elementos")
+      Dirección del sitio: URL del sitio
+      Nombre de la lista: TRZ_OrdenesCompra
+      Consulta de filtro: Cerrada eq 0 and Etapa eq 'Esperando factura' and FechaAlertaFactura le '@{variables('vHoy')}'
+      Recuento superior: 500
+
+  Paso 4b · Para cada sin factura ("Aplicar a cada uno")
+      Seleccionar una salida (expresión): outputs('Obtener_sin_factura')?['body/value']
+
+  Paso 4c · Aviso sin factura ("Crear elemento", dentro de 4b)
+      Dirección del sitio: URL del sitio
+      Nombre de la lista: TRZ_HistorialPO
+      Title (expresión): items('Para_cada_sin_factura')?['Title']
+      OrdenID (expresión): items('Para_cada_sin_factura')?['ID']
+      Tipo: Aviso
+      Detalle (expresión): concat('Llamar al proveedor ', items('Para_cada_sin_factura')?['Proveedor'], ': la PO ', items('Para_cada_sin_factura')?['Title'], ' no tiene factura en el plazo. Llamadas registradas: ', string(coalesce(items('Para_cada_sin_factura')?['Llamadas'], 0)), '.')
+      FechaEvento: @{variables('vHoy')}
+      Area: Sistema
+      RegistradoPor: Sistema
+      DestinatarioEmail: @{outputs('Correos_Proveedores')}
+
+
+--- Paso 5: 101 atrasado (aviso a Compras) --------------------------------
+
+
+  Paso 5a · Obtener 101 atrasado ("Obtener elementos")
+      Dirección del sitio: URL del sitio
+      Nombre de la lista: TRZ_OrdenesCompra
+      Consulta de filtro: Cerrada eq 0 and Etapa eq 'Pendiente 101' and FechaLimite101 lt '@{variables('vHoy')}'
+      Recuento superior: 500
+
+  Paso 5b · Para cada 101 atrasado ("Aplicar a cada uno")
+      Seleccionar una salida (expresión): outputs('Obtener_101_atrasado')?['body/value']
+
+  Paso 5c · Aviso 101 atrasado ("Crear elemento", dentro de 5b)
+      Dirección del sitio: URL del sitio
+      Nombre de la lista: TRZ_HistorialPO
+      Title (expresión): items('Para_cada_101_atrasado')?['Title']
+      OrdenID (expresión): items('Para_cada_101_atrasado')?['ID']
+      Tipo: Aviso
+      Detalle (expresión): concat('101 atrasado: la PO ', items('Para_cada_101_atrasado')?['Title'], ' de ', items('Para_cada_101_atrasado')?['Proveedor'], ' tiene la factura ', items('Para_cada_101_atrasado')?['NumFactura'], ' en el sistema y el límite era el ', formatDateTime(items('Para_cada_101_atrasado')?['FechaLimite101'], 'dd/MM/yyyy'), '.')
+      FechaEvento: @{variables('vHoy')}
+      Area: Sistema
+      RegistradoPor: Sistema
+      DestinatarioEmail: @{outputs('Correos_Compras')}
+
+
+--- Paso 6: factura sin recepción (ticket a Bodega) -----------------------
+
+
+  Paso 6a · Obtener sin recepcion ("Obtener elementos")
+      Dirección del sitio: URL del sitio
+      Nombre de la lista: TRZ_OrdenesCompra
+      Consulta de filtro: Cerrada eq 0 and Etapa eq 'Factura sin recepción' and FechaFactura lt '@{variables('vHoy')}'
+      Recuento superior: 500
+
+  Paso 6b · Para cada sin recepcion ("Aplicar a cada uno")
+      Seleccionar una salida (expresión): outputs('Obtener_sin_recepcion')?['body/value']
+
+  Paso 6c · Aviso sin recepcion ("Crear elemento", dentro de 6b)
+      Dirección del sitio: URL del sitio
+      Nombre de la lista: TRZ_HistorialPO
+      Title (expresión): items('Para_cada_sin_recepcion')?['Title']
+      OrdenID (expresión): items('Para_cada_sin_recepcion')?['ID']
+      Tipo: Aviso
+      Detalle (expresión): concat('Ticket pendiente: la factura ', items('Para_cada_sin_recepcion')?['NumFactura'], ' de la PO ', items('Para_cada_sin_recepcion')?['Title'], ' está en el buzón sin recepción en bodega. Confirmar si el producto llegó.')
+      FechaEvento: @{variables('vHoy')}
+      Area: Sistema
+      RegistradoPor: Sistema
+      DestinatarioEmail: @{outputs('Correos_Bodega')}
+
+
+--- Paso 7: pago vencido (aviso a Cuentas por pagar) ----------------------
+
+
+  Paso 7a · Obtener pago vencido ("Obtener elementos")
+      Dirección del sitio: URL del sitio
+      Nombre de la lista: TRZ_OrdenesCompra
+      Consulta de filtro: Cerrada eq 0 and Etapa eq 'En crédito' and FechaPagoEstimada le '@{variables('vHoy')}'
+      Recuento superior: 500
+
+  Paso 7b · Para cada pago vencido ("Aplicar a cada uno")
+      Seleccionar una salida (expresión): outputs('Obtener_pago_vencido')?['body/value']
+
+  Paso 7c · Aviso pago vencido ("Crear elemento", dentro de 7b)
+      Dirección del sitio: URL del sitio
+      Nombre de la lista: TRZ_HistorialPO
+      Title (expresión): items('Para_cada_pago_vencido')?['Title']
+      OrdenID (expresión): items('Para_cada_pago_vencido')?['ID']
+      Tipo: Aviso
+      Detalle (expresión): concat('Pago vencido: la PO ', items('Para_cada_pago_vencido')?['Title'], ' de ', items('Para_cada_pago_vencido')?['Proveedor'], ' tenía pago estimado el ', formatDateTime(items('Para_cada_pago_vencido')?['FechaPagoEstimada'], 'dd/MM/yyyy'), '.')
+      FechaEvento: @{variables('vHoy')}
+      Area: Sistema
+      RegistradoPor: Sistema
+      DestinatarioEmail: @{outputs('Correos_Pagos')}
+
+
+En la configuración de cada "Obtener elementos" activa Paginación con límite 5000.
+
+Los avisos se repiten cada día hábil mientras la PO siga en esa condición. Cuando Zoila registra una llamada, FechaAlertaFactura se mueve a la fecha de la siguiente llamada y el aviso de sin factura se detiene hasta entonces.
+
+
+##############################################################################
+# 3. Pruebas de los flujos
+##############################################################################
+
+[ ] Flujo 1: registra una recepción en la app; en menos de 5 minutos llega un correo a Compras y Proveedores con la PO en el asunto.
+[ ] Flujo 1: una nota o una llamada no envían correo (no son Tipo Aviso).
+[ ] Flujo 2: en una PO de prueba cambia a mano FechaAlertaFactura a ayer en SharePoint, ejecuta el flujo con Probar › Manualmente y revisa que aparezca un Aviso en el historial de esa PO y llegue el correo a Zoila.
+[ ] Flujo 2: haz lo mismo con FechaLimite101 (Pendiente 101), con una PO en Factura sin recepción y con FechaPagoEstimada (En crédito).
+[ ] Flujo 2: una PO con Cerrada = 1 nunca genera aviso.
+[ ] Si un área no tiene a nadie en TRZ_Equipo, el aviso se crea con DestinatarioEmail vacío y el Flujo 1 no lo envía; agrega a la persona en la pestaña Reglas de días.
+
+
+******************************************************************************
+PARTE 5 · ORDEN DE IMPLEMENTACIÓN Y PRUEBAS
+******************************************************************************
+
+
+##############################################################################
+# 10. Orden de implementación y pruebas
+##############################################################################
+
+Sigue este orden: cada paso depende del anterior, y así Power Apps no marca errores por nombres que todavía no existen.
+
+1. Crea las cinco listas con los nombres internos exactos de la sección 1 e indexa las columnas marcadas.
+2. Carga TRZ_Config (una fila) y TRZ_Equipo (Lorena, Magda, Zoila, la persona de pagos y tú como Admin).
+3. Crea la app de lienzo, agrega las cinco listas y ajusta Configuración (sección 3).
+4. Pega App.Formulas, luego App.OnStart, y ejecuta OnStart una vez.
+5. Construye el árbol de contenedores de la sección 4 de arriba hacia abajo, con los nombres exactos.
+6. Llena encabezado y Panel (5), Órdenes (6), formularios (7) y Reglas (8).
+7. Abre el Comprobador de aplicaciones y deja cero errores antes de publicar.
+8. Crea el Flujo 1 y el Flujo 2 (sección 9).
+9. Comparte la app y las cinco listas con el equipo (Contribuir en las listas).
+
+
+--- Pruebas antes de liberar ----------------------------------------------
+
+[ ] Al abrir, "Trabajando como" muestra tu nombre; con la cuenta de Magda muestra "Magda · Bodega (tú)".
+[ ] Magda cambia la vista a Lorena: ve sus pendientes, los botones quedan en gris y el aviso dice que solo esa persona registra.
+[ ] Lorena registra una PO con proveedor en modo Lista y otra en Texto libre; el proveedor nuevo aparece en el catálogo.
+[ ] Una PO repetida muestra "La PO ya está registrada" y no se crea.
+[ ] Magda confirma la recepción: la PO pasa a Esperando factura, se crea el aviso y llega el correo a Lorena y Zoila.
+[ ] Con Fecha de trabajo 3 días hábiles después, la PO pasa a rojo y aparece en los pendientes de Zoila.
+[ ] Zoila registra una llamada: el estatus no cambia, el contador sube y la alerta se mueve 3 días hábiles.
+[ ] Factura antes que recepción: la PO queda en Factura sin recepción y Magda recibe el ticket.
+[ ] Lorena da el 101 con factura: pasa a En crédito con fecha estimada de pago = 101 + crédito.
+[ ] Rechazar la factura: vuelve a Esperando factura, suma un rechazo y Zoila recibe el aviso.
+[ ] Cuentas por pagar registra el pago: la PO queda Pagada, Cerrada = 1 y sale de Pendientes.
+[ ] El historial muestra los movimientos del más nuevo al más viejo y los tres filtros (Todo, Registros del equipo, Avisos automáticos) cuentan bien.
+[ ] El buscador encuentra por PO, proveedor, descripción, número de factura y etapa.
+[ ] Dos personas abren la misma PO; la segunda que confirma la recepción recibe "Otra persona ya registró la recepción".
+[ ] El Flujo 2 ejecutado a mano crea avisos solo para las PO vencidas.
+[ ] Comprobador de aplicaciones: cero errores y cero advertencias de delegación.
